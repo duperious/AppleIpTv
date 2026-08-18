@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { buildIndex } from '@appleiptv/core';
 import type { LiveChannel, MediaItem } from '@appleiptv/core';
-import { useApp, useCatalog } from '../store/useApp';
+import { useApp, useCatalog, useCatalogIndex } from '../store/useApp';
 import { Card, EmptyState, LazyGrid } from '../components/ui';
 import { usePlayback } from '../playback/PlaybackProvider';
 
@@ -12,7 +11,7 @@ export function FavoritesPage() {
   const favorites = useApp((state) => state.favorites);
   const { play } = usePlayback();
 
-  const index = useMemo(() => buildIndex(catalog), [catalog]);
+  const index = useCatalogIndex(catalog);
   const items = useMemo(
     () =>
       favorites

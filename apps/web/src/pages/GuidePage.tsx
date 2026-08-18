@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { buildIndex, categoriesOfKind, itemsInCategory } from '@appleiptv/core';
+import { categoriesOfKind, itemsInCategory } from '@appleiptv/core';
 import type { LiveChannel } from '@appleiptv/core';
-import { useCatalog, useHiddenCategoryIds } from '../store/useApp';
+import { useCatalog, useHiddenCategoryIds, useCatalogIndex } from '../store/useApp';
 import { EmptyState } from '../components/ui';
 import { useEpg } from '../hooks/useEpg';
 import { formatClock } from '../lib/format';
@@ -19,7 +19,7 @@ export function GuidePage() {
   const epg = useEpg();
   const { play } = usePlayback();
 
-  const index = useMemo(() => buildIndex(catalog), [catalog]);
+  const index = useCatalogIndex(catalog);
   const categories = useMemo(
     () => categoriesOfKind(catalog, 'live', { hiddenCategoryIds: hidden }),
     [catalog, hidden],

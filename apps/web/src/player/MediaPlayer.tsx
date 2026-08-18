@@ -33,6 +33,16 @@ export function MediaPlayer(props: MediaPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<number | undefined>(undefined);
   const lastReport = useRef(0);
+  /**
+   * Son bilinen konum. Cikista video etiketi zaten bosaltilmis olabilecegi
+   * icin ilerlemeyi dogrudan `video.currentTime`den degil buradan okuyoruz.
+   */
+  const lastKnown = useRef({ position: 0, duration: 0 });
+  /** Her cizimde degisen geri cagriyi etkilere tasimadan guncel tutar. */
+  const onProgressRef = useRef(onProgress);
+  onProgressRef.current = onProgress;
+  const liveRef = useRef(live);
+  liveRef.current = live;
 
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
@@ -52,6 +62,25 @@ export function MediaPlayer(props: MediaPlayerProps) {
     window.clearTimeout(hideTimer.current);
     hideTimer.current = window.setTimeout(() => setControlsVisible(false), CONTROLS_TIMEOUT);
   }, []);
+
+  /**
+   * Cikista son konumu kaydeder.
+   *
+   * Bilerek motor etkisinden once tanimlandi: React temizleyicileri tanim
+   * sirasiyla calistirir, dolayisiyla video etiketi henuz bosaltilmamisken
+   * gercek konumu okuyabiliyoruz. Okuma basarisiz olursa (motor onceden
+   * kapanmissa) son bilinen degere duseriz.
+   */
+  useEffect(
+    () => () => {
+      const video = videoRef.current;
+      const liveDuration = video && Number.isFinite(video.duration) ? video.duration : 0;
+      const duration = liveDuration > 0 ? liveDuration : lastKnown.current.duration;
+      const position = liveDuration > 0 ? video!.currentTime : lastKnown.current.position;
+      if (!liveRef.current && duration > 0) onProgressRef.current?.(position, duration);
+    },
+    [],
+  );
 
   // Kaynak degistiginde motoru yeniden kur.
   useEffect(() => {
@@ -92,13 +121,20 @@ export function MediaPlayer(props: MediaPlayerProps) {
     const video = videoRef.current;
     if (!video) return;
 
+    /** Konumu ref'e yazar; cikista kaydedilecek deger budur. */
+    const capture = () => {
+      if (Number.isFinite(video.duration) && video.duration > 0) {
+        lastKnown.current = { position: video.currentTime, duration: video.duration };
+      }
+    };
     const onTime = () => {
       setPosition(video.currentTime);
       if (video.buffered.length > 0) setBuffered(video.buffered.end(video.buffered.length - 1));
+      capture();
       const now = Date.now();
-      if (onProgress && !live && now - lastReport.current > 5000 && video.duration > 0) {
+      if (!live && now - lastReport.current > 5000 && video.duration > 0) {
         lastReport.current = now;
-        onProgress(video.currentTime, video.duration);
+        onProgressRef.current?.(video.currentTime, video.duration);
       }
     };
     const onMeta = () => {
@@ -116,6 +152,11 @@ export function MediaPlayer(props: MediaPlayerProps) {
     const onPlaying = () => setStatus(undefined);
 
     video.addEventListener('timeupdate', onTime);
+    // Ileri/geri sarma ve duraklatma da konumu guncellemeli; aksi halde
+    // sarmanin hemen ardindan cikilirsa eski konum kaydedilir.
+    video.addEventListener('seeked', capture);
+    video.addEventListener('pause', capture);
+    video.addEventListener('ended', capture);
     video.addEventListener('loadedmetadata', onMeta);
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
@@ -123,23 +164,16 @@ export function MediaPlayer(props: MediaPlayerProps) {
     video.addEventListener('playing', onPlaying);
     return () => {
       video.removeEventListener('timeupdate', onTime);
+      video.removeEventListener('seeked', capture);
+      video.removeEventListener('pause', capture);
+      video.removeEventListener('ended', capture);
       video.removeEventListener('loadedmetadata', onMeta);
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
       video.removeEventListener('waiting', onWaiting);
       video.removeEventListener('playing', onPlaying);
     };
-  }, [onProgress, live, startPositionSecs]);
-
-  // Cikista son konumu kaydet.
-  useEffect(() => {
-    const video = videoRef.current;
-    return () => {
-      if (!live && video && onProgress && video.duration > 0) {
-        onProgress(video.currentTime, video.duration);
-      }
-    };
-  }, [live, onProgress]);
+  }, [live, startPositionSecs]);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
@@ -148,11 +182,27 @@ export function MediaPlayer(props: MediaPlayerProps) {
     else video.pause();
   }, []);
 
+  /**
+   * Belirli bir konuma atlar.
+   *
+   * Hedef konumu aninda `lastKnown`e de yaziyoruz: medya ogesi sarma
+   * tamamlanana kadar eski konumu bildirebiliyor ve sarmanin hemen
+   * ardindan cikilirsa yanlis konum kaydedilirdi.
+   */
+  const seekTo = useCallback((seconds: number) => {
+    const video = videoRef.current;
+    if (!video || live) return;
+    const duration = Number.isFinite(video.duration) ? video.duration : 0;
+    const target = Math.max(0, duration > 0 ? Math.min(duration, seconds) : seconds);
+    video.currentTime = target;
+    if (duration > 0) lastKnown.current = { position: target, duration };
+  }, [live]);
+
   const seekBy = useCallback((delta: number) => {
     const video = videoRef.current;
     if (!video || live) return;
-    video.currentTime = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + delta));
-  }, [live]);
+    seekTo(video.currentTime + delta);
+  }, [live, seekTo]);
 
   const changeVolume = useCallback((delta: number) => {
     const video = videoRef.current;
@@ -289,8 +339,7 @@ export function MediaPlayer(props: MediaPlayerProps) {
               onClick={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
                 const ratio = (event.clientX - rect.left) / rect.width;
-                const video = videoRef.current;
-                if (video && duration > 0) video.currentTime = ratio * duration;
+                if (duration > 0) seekTo(ratio * duration);
               }}
             >
               <div className="player__seek-buffer" style={{ width: `${bufferedPercent}%` }} />

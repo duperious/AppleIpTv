@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { buildIndex, categoriesOfKind, itemsInCategory, normalizeText } from '@appleiptv/core';
+import { categoriesOfKind, itemsInCategory, normalizeText } from '@appleiptv/core';
 import type { MediaKind, MovieItem, SeriesItem } from '@appleiptv/core';
-import { useCatalog, useHiddenCategoryIds } from '../store/useApp';
+import { useCatalog, useHiddenCategoryIds, useCatalogIndex } from '../store/useApp';
 import { Card, EmptyState, LazyGrid } from '../components/ui';
 
 type Sortable = MovieItem | SeriesItem;
@@ -13,7 +13,7 @@ export function BrowsePage({ kind }: { kind: Exclude<MediaKind, 'live'> }) {
   const navigate = useNavigate();
   const catalog = useCatalog();
   const hidden = useHiddenCategoryIds(catalog);
-  const index = useMemo(() => buildIndex(catalog), [catalog]);
+  const index = useCatalogIndex(catalog);
 
   const [categoryId, setCategoryId] = useState('');
   const [filter, setFilter] = useState('');

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import {
   StorageKeys,
@@ -381,16 +382,33 @@ async function loadProfileData(profileId: string, set: (partial: Partial<AppStat
   });
 }
 
-/** Etkin kaynaklarin birlesik katalogu. */
+/**
+ * Etkin kaynaklarin birlesik katalogu.
+ *
+ * `playlists` ve `catalogs` yalnizca depo guncellendiginde yeni referans
+ * aldigi icin useMemo, yuz binlerce kaydin her cizimde birlestirilmesini
+ * engeller.
+ */
 export function useCatalog(): Catalog {
   const playlists = useApp((state) => state.playlists);
   const catalogs = useApp((state) => state.catalogs);
-  const enabled = playlists.filter((playlist) => playlist.enabled);
-  return mergeCatalogs(enabled.map((playlist) => catalogs[playlist.id]).filter(Boolean) as Catalog[]);
+  return useMemo(() => {
+    const enabled = playlists.filter((playlist) => playlist.enabled);
+    return mergeCatalogs(enabled.map((playlist) => catalogs[playlist.id]).filter(Boolean) as Catalog[]);
+  }, [playlists, catalogs]);
 }
 
+/** Katalog nesnesi basina bir kez kurulan dizin onbellegi. */
+const indexCache = new WeakMap<Catalog, CatalogIndex>();
+
 export function useCatalogIndex(catalog: Catalog): CatalogIndex {
-  return buildIndex(catalog);
+  return useMemo(() => {
+    const cached = indexCache.get(catalog);
+    if (cached) return cached;
+    const index = buildIndex(catalog);
+    indexCache.set(catalog, index);
+    return index;
+  }, [catalog]);
 }
 
 export function useActiveProfile(): Profile | undefined {

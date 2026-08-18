@@ -153,10 +153,24 @@ ve arka planda tazelenir.
 ## Gelistirme
 
 ```bash
-npm test                    # cekirdek kutuphane birim testleri (vitest)
+npm test                    # cekirdek kutuphane birim testleri (vitest, 42 test)
 npm run typecheck           # TypeScript tur denetimi
 npm run build               # cekirdek + web derlemesi
 ```
+
+### Uctan uca testler
+
+`apps/web/e2e` altinda, sahte bir IPTV sunucusuna karsi gercek Chromium'da
+calisan senaryolar var: M3U ayristirma + EPG rehberi, Xtream girisi ve
+oynatma adresi uretimi, gercek video oynatma ile ilerleme kaydi.
+
+```bash
+npm run build -w @appleiptv/web
+npm i -D playwright && npx playwright install chromium
+node apps/web/e2e/run.mjs
+```
+
+Ayrintilar: [`apps/web/e2e/README.md`](apps/web/e2e/README.md)
 
 ## Lisans
 

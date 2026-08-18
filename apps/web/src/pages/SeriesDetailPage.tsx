@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { XtreamClient, buildIndex } from '@appleiptv/core';
+import { XtreamClient } from '@appleiptv/core';
 import type { Episode, SeriesItem } from '@appleiptv/core';
-import { useApp, useCatalog } from '../store/useApp';
+import { useApp, useCatalog, useCatalogIndex } from '../store/useApp';
 import { EmptyState, Poster, Spinner } from '../components/ui';
 import { usePlayback } from '../playback/PlaybackProvider';
 import type { PlayRequest } from '../playback/PlaybackProvider';
@@ -19,7 +19,7 @@ export function SeriesDetailPage() {
   const toggleFavorite = useApp((state) => state.toggleFavorite);
   const { play } = usePlayback();
 
-  const index = useMemo(() => buildIndex(catalog), [catalog]);
+  const index = useCatalogIndex(catalog);
   const base = index.byId.get(decodeURIComponent(id));
   const [series, setSeries] = useState<SeriesItem | undefined>(base?.kind === 'series' ? base : undefined);
   const [loading, setLoading] = useState(false);

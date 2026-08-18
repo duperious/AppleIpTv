@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { buildIndex, categoriesOfKind, itemsInCategory, normalizeText, verifyPin } from '@appleiptv/core';
+import { categoriesOfKind, itemsInCategory, normalizeText, verifyPin } from '@appleiptv/core';
 import type { LiveChannel } from '@appleiptv/core';
-import { useActiveProfile, useApp, useCatalog, useHiddenCategoryIds } from '../store/useApp';
+import { useActiveProfile, useApp, useCatalog, useHiddenCategoryIds, useCatalogIndex } from '../store/useApp';
 import { EmptyState, PinDialog, Poster } from '../components/ui';
 import { usePlayback } from '../playback/PlaybackProvider';
 import { useEpg } from '../hooks/useEpg';
@@ -27,7 +27,7 @@ export function LivePage() {
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [pendingLock, setPendingLock] = useState<string | undefined>();
 
-  const index = useMemo(() => buildIndex(catalog), [catalog]);
+  const index = useCatalogIndex(catalog);
   const categories = useMemo(
     () => categoriesOfKind(catalog, 'live', { hiddenCategoryIds: hidden }),
     [catalog, hidden],

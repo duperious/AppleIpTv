@@ -1,0 +1,166 @@
+/**
+ * Uctan uca senaryolar. Her senaryo temiz bir tarayici baglaminda calisir
+ * ve gercek bir kullanicinin izleyecegi yolu takip eder.
+ */
+
+const log = (...parts) => console.log('   •', ...parts);
+
+/** Ilk acilista profil olusturur. */
+async function createProfile(page, baseURL, name) {
+  await page.goto(baseURL, { waitUntil: 'networkidle' });
+  await page.locator('input').first().fill(name);
+  await page.getByRole('button', { name: 'Olustur' }).click();
+  await page.waitForURL('**/settings/sources');
+}
+
+async function addM3USource(page, baseURL, url) {
+  await page.getByRole('button', { name: 'M3U adresi' }).click();
+  await page.locator('label:has-text("M3U adresi") input').fill(url);
+  await page.getByRole('button', { name: 'Kaynagi ekle' }).click();
+  await page.waitForURL(baseURL, { timeout: 30_000 });
+}
+
+/** IndexedDB'ye yazilmis bir kaydi okur. */
+async function readStored(page, prefix) {
+  return page.evaluate(async (keyPrefix) => {
+    const request = indexedDB.open('appleiptv');
+    const db = await new Promise((resolve) => { request.onsuccess = () => resolve(request.result); });
+    const keys = await new Promise((resolve) => {
+      const query = db.transaction('kv', 'readonly').objectStore('kv').getAllKeys();
+      query.onsuccess = () => resolve(query.result);
+    });
+    const key = keys.map(String).find((item) => item.startsWith(keyPrefix));
+    if (!key) return null;
+    return new Promise((resolve) => {
+      const query = db.transaction('kv', 'readonly').objectStore('kv').get(key);
+      query.onsuccess = () => resolve(query.result);
+    });
+  }, prefix);
+}
+
+/** M3U kaynagi: ayristirma, EPG eslesmesi, dizi gruplama, favori kaliciligi. */
+export async function m3uFlow(page, baseURL) {
+  await createProfile(page, baseURL, 'M3U Test');
+  await addM3USource(page, baseURL, 'http://127.0.0.1:8899/get.php?username=a&password=b');
+
+  await page.getByRole('link', { name: 'Canli TV' }).click();
+  await page.waitForSelector('.channel');
+  const channels = await page.locator('.channel').allTextContents();
+  log('kanallar:', channels.length);
+  if (channels.length !== 2) throw new Error(`Beklenen 2 kanal, gelen ${channels.length}`);
+  if (!channels.join(' ').includes('Ana Haber')) throw new Error('EPG bilgisi kanal listesinde gorunmuyor');
+
+  await page.getByRole('link', { name: 'Rehber' }).click();
+  await page.waitForSelector('.guide__program');
+  const programs = await page.locator('.guide__program').allTextContents();
+  log('rehber programlari:', programs.join(', '));
+  if (!programs.some((title) => title.includes('Derbi'))) throw new Error('Rehberde program bulunamadi');
+
+  await page.getByRole('link', { name: 'Diziler' }).click();
+  await page.waitForSelector('.card');
+  await page.locator('.card').first().click();
+  await page.waitForSelector('.episodes li');
+  const episodes = await page.locator('.episode__text strong').allTextContents();
+  log('bolumler:', episodes.join(' | '));
+  if (episodes.length !== 2) throw new Error(`Beklenen 2 bolum, gelen ${episodes.length}`);
+
+  await page.locator('#global-search').fill('bein');
+  await page.locator('#global-search').press('Enter');
+  await page.waitForSelector('.card');
+  const firstResult = await page.locator('.card__name').first().textContent();
+  log('arama sonucu:', firstResult);
+  if (!firstResult?.toLowerCase().includes('bein')) throw new Error('Arama sonucu beklenenden farkli');
+
+  await page.getByRole('link', { name: 'Canli TV' }).click();
+  await page.waitForSelector('.channel__fav');
+  await page.locator('.channel__fav').first().click();
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('link', { name: 'Favoriler' }).click();
+  await page.waitForSelector('.card');
+  log('favori (yenilemeden sonra):', await page.locator('.card__name').first().textContent());
+}
+
+/** Xtream girisi: kimlik dogrulama, katalog ve oynatma adresi uretimi. */
+export async function xtreamFlow(page, baseURL) {
+  await createProfile(page, baseURL, 'Xtream Test');
+
+  await page.locator('label:has-text("Sunucu adresi") input').fill('127.0.0.1:8899');
+  await page.locator('label:has-text("Kullanici adi") input').fill('test');
+  await page.locator('label:has-text("Sifre") input').fill('gizli');
+  await page.getByRole('button', { name: 'Kaynagi ekle' }).click();
+  await page.waitForURL(baseURL, { timeout: 30_000 });
+
+  await page.getByRole('link', { name: 'Ayarlar' }).click();
+  await page.getByRole('link', { name: 'Kaynaklari yonet' }).click();
+  await page.waitForSelector('.list__item');
+  const summary = (await page.locator('.list__meta').first().textContent())?.replace(/\s+/g, ' ').trim();
+  log('kaynak ozeti:', summary);
+  if (!summary?.includes('Xtream Codes')) throw new Error('Kaynak Xtream olarak kaydedilmedi');
+  if (!summary.includes('1 kanal')) throw new Error('Kanal sayisi beklenenden farkli');
+
+  const catalog = await readStored(page, 'catalog:');
+  const liveURL = catalog?.live?.[0]?.url ?? '';
+  const movieURL = catalog?.movies?.[0]?.url ?? '';
+  log('canli adres:', liveURL);
+  log('film adresi:', movieURL);
+  if (!liveURL.includes('/live/test/gizli/1.m3u8')) throw new Error(`Canli adres hatali: ${liveURL}`);
+  if (!movieURL.includes('/movie/test/gizli/10.mp4')) throw new Error(`Film adresi hatali: ${movieURL}`);
+}
+
+/** Oynatma: gercek video, klavye kisayollari ve ilerleme kaydi. */
+export async function playbackFlow(page, baseURL) {
+  await createProfile(page, baseURL, 'Oynatma');
+  await addM3USource(page, baseURL, 'http://127.0.0.1:8899/get.php');
+
+  await page.getByRole('link', { name: 'Filmler' }).click();
+  await page.waitForSelector('.card');
+  await page.locator('.card').first().click();
+  await page.waitForSelector('.detail__actions');
+  await page.locator('.detail__actions button.btn--primary').click();
+
+  await page.waitForSelector('.player__video');
+  await page.waitForFunction(() => {
+    const video = document.querySelector('video');
+    return video && video.currentTime > 1.5 && !video.paused;
+  }, { timeout: 20_000 });
+
+  const state = await page.evaluate(() => {
+    const video = document.querySelector('video');
+    return { time: video.currentTime, duration: video.duration, width: video.videoWidth };
+  });
+  log('video:', `${state.width}px, ${state.time.toFixed(1)}/${state.duration.toFixed(1)} sn`);
+  if (state.width === 0) throw new Error('Video karesi cozulemedi');
+
+  await page.keyboard.press(' ');
+  await page.waitForFunction(() => document.querySelector('video')?.paused === true, { timeout: 5000 });
+  await page.keyboard.press('ArrowRight');
+  const seeked = await page.evaluate(() => document.querySelector('video').currentTime);
+  log('ileri sarma sonrasi:', seeked.toFixed(1), 'sn');
+  if (seeked < state.time + 5) throw new Error('Ileri sarma calismadi');
+
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.player__video', { state: 'detached' });
+
+  const progress = await readStored(page, 'progress:');
+  log('kaydedilen ilerleme:', progress?.[0]?.positionSecs?.toFixed(1), 'sn');
+  if (!progress?.length) throw new Error('Ilerleme kaydedilmedi');
+  if (progress[0].positionSecs < 5) throw new Error('Cikista sarma konumu kaydedilmedi');
+  if (!progress[0].completed) throw new Error('Sona gelen icerik bitmis isaretlenmedi');
+
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('link', { name: 'Filmler' }).click();
+  await page.waitForSelector('.card');
+  await page.locator('.card').first().click();
+  await page.waitForSelector('.detail__actions');
+  const actions = await page.locator('.detail__actions button, .detail__actions a').allTextContents();
+  if (!actions.some((label) => label.includes('Bastan oynat'))) {
+    throw new Error('Izleme kaydi yenilemeden sonra korunmadi');
+  }
+  log('izleme kaydi yenilemeden sonra korundu');
+}
+
+export const scenarios = [
+  { name: 'M3U akisi', run: m3uFlow },
+  { name: 'Xtream akisi', run: xtreamFlow },
+  { name: 'Oynatma ve ilerleme', run: playbackFlow },
+];

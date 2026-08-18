@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { buildIndex, continueWatching, recentlyAdded } from '@appleiptv/core';
+import { continueWatching, recentlyAdded } from '@appleiptv/core';
 import type { LiveChannel, MovieItem, SeriesItem } from '@appleiptv/core';
-import { useActiveProfile, useApp, useCatalog, useHiddenCategoryIds } from '../store/useApp';
+import { useActiveProfile, useApp, useCatalog, useHiddenCategoryIds, useCatalogIndex } from '../store/useApp';
 import { Card, EmptyState, Rail } from '../components/ui';
 import { usePlayback } from '../playback/PlaybackProvider';
 import { useEpg } from '../hooks/useEpg';
@@ -20,7 +20,7 @@ export function HomePage() {
   const { play } = usePlayback();
   const epg = useEpg();
 
-  const index = useMemo(() => buildIndex(catalog), [catalog]);
+  const index = useCatalogIndex(catalog);
   const visible = useMemo(
     () => <T extends { categoryIds: string[] }>(items: readonly T[]) =>
       items.filter((item) => !item.categoryIds.some((id) => hidden.has(id))),
