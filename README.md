@@ -104,6 +104,12 @@ Uygulama bir PWA'dir; Safari/Chrome'da "Ana ekrana ekle" ile tam ekran
 calisir. Tum veriler tarayicinin IndexedDB'sinde tutulur, sunucuya hicbir
 sey gonderilmez.
 
+### Windows kullaniyorsaniz
+
+Adim adim kurulum, tek tikla baslatma dosyasi ve Windows'a ozel sorun
+giderme icin: [`docs/WINDOWS.md`](docs/WINDOWS.md).
+`scripts\windows\AppleIpTv-Baslat.bat` dosyasina cift tiklamak yeterlidir.
+
 ---
 
 ## Apple TV 4K'ya kurulum
