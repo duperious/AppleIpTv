@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+.DS_Store
+*.log
+.env
+.env.local
+coverage/
+.vite/
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+*.xcodeproj/project.xcworkspace/

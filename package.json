@@ -1,0 +1,19 @@
+{
+  "name": "appleiptv",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Ucretsiz, acik kaynak IPTV oynatici: tvOS (Apple TV 4K) + Web. M3U ve Xtream Codes destegi.",
+  "workspaces": [
+    "packages/*",
+    "apps/web",
+    "apps/proxy"
+  ],
+  "scripts": {
+    "build": "npm run build -w @appleiptv/core && npm run build -w @appleiptv/web",
+    "dev": "npm run dev -w @appleiptv/web",
+    "proxy": "npm run start -w @appleiptv/proxy",
+    "test": "npm run test -w @appleiptv/core",
+    "typecheck": "npm run typecheck -w @appleiptv/core && npm run typecheck -w @appleiptv/web"
+  },
+  "engines": { "node": ">=20" }
+}
