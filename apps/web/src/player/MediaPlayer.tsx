@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { attachEngine } from './engine';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { attachEngine, playbackCandidates } from './engine';
 import type { EngineHandle } from './engine';
 import { formatPosition } from '../lib/format';
 
@@ -9,6 +9,8 @@ export interface MediaPlayerProps {
   subtitle?: string;
   live: boolean;
   liveBufferSecs: number;
+  /** Canli yayinlarin CORS engeline takilmamasi icin proxy adresi. */
+  proxyUrl?: string;
   /** Kaldigi yerden devam etmek icin baslangic konumu (sn). */
   startPositionSecs?: number;
   onProgress?: (positionSecs: number, durationSecs: number) => void;
@@ -27,7 +29,7 @@ const CONTROLS_TIMEOUT = 3500;
  * destekler; klavye ve uzaktan kumanda tuslariyla yonetilir.
  */
 export function MediaPlayer(props: MediaPlayerProps) {
-  const { url, title, subtitle, live, liveBufferSecs, startPositionSecs, onProgress, onClose, onChannelStep, onNext } = props;
+  const { url, title, subtitle, live, liveBufferSecs, proxyUrl, startPositionSecs, onProgress, onClose, onChannelStep, onNext } = props;
   const videoRef = useRef<HTMLVideoElement>(null);
   const engineRef = useRef<EngineHandle | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -56,6 +58,23 @@ export function MediaPlayer(props: MediaPlayerProps) {
   const [levels, setLevels] = useState<{ index: number; label: string }[]>([]);
   const [currentLevel, setCurrentLevel] = useState(-1);
   const [showSettings, setShowSettings] = useState(false);
+  /** Otomatik oynatma icin sesi kapatmak zorunda kaldik mi? */
+  const [autoMuted, setAutoMuted] = useState(false);
+  /**
+   * Denenen adres sirasi. Canli yayinlarda `.ts` acilmazsa ayni yayinin
+   * `.m3u8` bicimi otomatik deneniyor.
+   */
+  const [attempt, setAttempt] = useState(0);
+  /** Elle "yeniden dene" icin motoru bastan kurmayi tetikler. */
+  const [reloadToken, setReloadToken] = useState(0);
+
+  const candidates = useMemo(() => playbackCandidates(url, live), [url, live]);
+  const activeUrl = candidates[Math.min(attempt, candidates.length - 1)] ?? url;
+
+  useEffect(() => {
+    setAttempt(0);
+    setAutoMuted(false);
+  }, [url]);
 
   const revealControls = useCallback(() => {
     setControlsVisible(true);
@@ -91,12 +110,39 @@ export function MediaPlayer(props: MediaPlayerProps) {
     setPosition(0);
     setDuration(0);
 
+    /**
+     * Sesli otomatik oynatma tarayicilarca engellenebilir. Bu durumda
+     * yayini sessiz baslatip kullaniciya tek tikla sesi acma secenegi
+     * sunuyoruz; kullaniciyi bos bir ekranla birakmiyoruz.
+     */
+    const startPlayback = async () => {
+      try {
+        await video.play();
+      } catch {
+        video.muted = true;
+        setMuted(true);
+        setAutoMuted(true);
+        try {
+          await video.play();
+        } catch {
+          setStatus('Oynatma baslatilamadi, oynat tusuna basin.');
+        }
+      }
+    };
+
     let handle: EngineHandle | null = null;
     handle = attachEngine(video, {
-      url,
+      url: activeUrl,
       live,
       liveBufferSecs,
+      proxyUrl,
       onError: (message, isFatal) => {
+        // Elde denenmemis alternatif adres varsa once onu deneyelim.
+        if (isFatal && attempt < candidates.length - 1) {
+          setStatus('Alternatif yayin adresi deneniyor...');
+          setAttempt((current) => current + 1);
+          return;
+        }
         setStatus(message);
         setFatal(isFatal);
       },
@@ -105,7 +151,7 @@ export function MediaPlayer(props: MediaPlayerProps) {
         // Motor kurulumu tamamlanmadan cagrilabildigi icin bir sonraki
         // mikro gorevde kalite listesini okuyoruz.
         queueMicrotask(() => setLevels(handle?.levels?.() ?? []));
-        void video.play().catch(() => setStatus('Otomatik oynatma engellendi, oynat tusuna basin.'));
+        void startPlayback();
       },
     });
     engineRef.current = handle;
@@ -114,7 +160,7 @@ export function MediaPlayer(props: MediaPlayerProps) {
       handle?.destroy();
       engineRef.current = null;
     };
-  }, [url, live, liveBufferSecs]);
+  }, [activeUrl, attempt, candidates.length, live, liveBufferSecs, proxyUrl, reloadToken]);
 
   // Video etiketi olaylari.
   useEffect(() => {
@@ -175,11 +221,37 @@ export function MediaPlayer(props: MediaPlayerProps) {
     };
   }, [live, startPositionSecs]);
 
+  /** Motoru bastan kurar (yayin hic acilmadiysa tek care budur). */
+  const retry = useCallback(() => {
+    setFatal(false);
+    setStatus('Yayin aciliyor...');
+    setReloadToken((token) => token + 1);
+  }, []);
+
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) void video.play();
-    else video.pause();
+    // Yayin hic yuklenmediyse `play()` sessizce basarisiz olur; bu durumda
+    // butonun tek anlamli davranisi motoru yeniden kurmaktir.
+    if (!engineRef.current || video.readyState === 0) {
+      retry();
+      return;
+    }
+    if (video.paused) {
+      void video.play().catch(() => setStatus('Oynatma baslatilamadi.'));
+    } else {
+      video.pause();
+    }
+  }, [retry]);
+
+  const unmute = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = false;
+    if (video.volume === 0) video.volume = 1;
+    setMuted(false);
+    setVolume(video.volume);
+    setAutoMuted(false);
   }, []);
 
   /**
@@ -307,9 +379,14 @@ export function MediaPlayer(props: MediaPlayerProps) {
         <div className="player__status">
           <div className={`player__status-text ${fatal ? 'player__status-text--error' : ''}`}>{status}</div>
           {fatal && (
-            <button type="button" className="btn" onClick={onClose}>
-              Geri don
-            </button>
+            <div className="player__status-actions">
+              <button type="button" className="btn btn--primary" onClick={retry}>
+                Yeniden dene
+              </button>
+              <button type="button" className="btn" onClick={onClose}>
+                Geri don
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -363,6 +440,11 @@ export function MediaPlayer(props: MediaPlayerProps) {
             {live && engineRef.current?.seekToLive && (
               <button type="button" className="btn btn--ghost" onClick={() => engineRef.current?.seekToLive?.()}>
                 Cana don
+              </button>
+            )}
+            {autoMuted && (
+              <button type="button" className="btn btn--primary player__unmute" onClick={unmute}>
+                🔊 Sesi ac
               </button>
             )}
             <span className="player__spacer" />

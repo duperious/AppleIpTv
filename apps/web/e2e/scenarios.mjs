@@ -159,8 +159,65 @@ export async function playbackFlow(page, baseURL) {
   log('izleme kaydi yenilemeden sonra korundu');
 }
 
+/**
+ * Canli yayin: CORS gondermeyen bir saglayiciya karsi once tanilama
+ * mesaji, sonra proxy ile gercek oynatma zinciri dogrulanir.
+ */
+export async function liveFlow(page, baseURL) {
+  await createProfile(page, baseURL, 'Canli Test');
+  await addM3USource(page, baseURL, 'http://127.0.0.1:8899/get.php');
+
+  // 1) Proxy yokken: kullaniciya sebebi anlatan bir mesaj cikmali.
+  await page.getByRole('link', { name: 'Canli TV' }).click();
+  await page.waitForSelector('.channel');
+  await page.locator('.channel').first().click();
+  await page.locator('.live__detail button.btn--primary').click();
+  await page.waitForSelector('.player__status-text--error', { timeout: 30_000 });
+  const message = await page.locator('.player__status-text').textContent();
+  log('proxy yokken:', message);
+  if (!/CORS|proxy/i.test(message ?? '')) throw new Error(`CORS tanisi gosterilmedi: ${message}`);
+  if (!(await page.getByRole('button', { name: 'Yeniden dene' }).isVisible())) {
+    throw new Error('Yeniden dene butonu gorunmuyor');
+  }
+  await page.getByRole('button', { name: 'Geri don' }).click();
+
+  // 2) Proxy tanimliyken: hem yayin listesi hem parcalar proxy'den inmeli.
+  await page.getByRole('link', { name: 'Ayarlar' }).click();
+  await page.locator('label:has-text("CORS proxy adresi") input').fill('http://127.0.0.1:8787/proxy?url=');
+  await page.waitForTimeout(400);
+
+  await page.getByRole('link', { name: 'Canli TV' }).click();
+  await page.waitForSelector('.channel');
+  await page.locator('.channel').first().click();
+  await page.evaluate(() => performance.clearResourceTimings());
+  await page.locator('.live__detail button.btn--primary').click();
+  await page.waitForSelector('.player__video');
+
+  await page.waitForFunction(
+    () => performance.getEntriesByType('resource').filter((entry) => entry.name.includes('/proxy?url=')).length >= 2,
+    { timeout: 30_000 },
+  );
+  const proxied = await page.evaluate(() =>
+    performance
+      .getEntriesByType('resource')
+      .map((entry) => entry.name)
+      .filter((name) => name.includes('/proxy?url='))
+      .map((name) => decodeURIComponent(new URL(name).searchParams.get('url') ?? '')),
+  );
+  log('proxy uzerinden inenler:', proxied.length, 'istek');
+  if (!proxied.some((url) => url.endsWith('.m3u8'))) {
+    throw new Error(`Yayin listesi proxy uzerinden inmedi: ${JSON.stringify(proxied)}`);
+  }
+  if (!proxied.some((url) => url.includes('segment'))) {
+    throw new Error(`Yayin parcalari proxy uzerinden inmedi: ${JSON.stringify(proxied)}`);
+  }
+  // Kanal adresi .ts idi; parcalarin inmesi .m3u8 gecisinin calistigini gosterir.
+  log('.ts -> .m3u8 gecisi ve parca indirme dogrulandi');
+}
+
 export const scenarios = [
   { name: 'M3U akisi', run: m3uFlow },
   { name: 'Xtream akisi', run: xtreamFlow },
   { name: 'Oynatma ve ilerleme', run: playbackFlow },
+  { name: 'Canli yayin ve proxy', run: liveFlow },
 ];

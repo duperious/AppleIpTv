@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildCatalogFromM3U } from '../src/parsers/m3u.js';
 import { buildIndex, categoriesOfKind, itemsInCategory, mergeCatalogs, searchCatalog, uniquePlaylistName } from '../src/library/catalog.js';
 import { DEFAULT_SETTINGS, continueWatching, createProfile, isAdultCategory, setPin, updateProgress, verifyPin } from '../src/library/profiles.js';
-import { normalizeText, channelMatchKey } from '../src/utils.js';
+import { normalizeText, channelMatchKey, withProxy } from '../src/utils.js';
 import type { Playlist, WatchProgress } from '../src/types.js';
 
 const M3U = `#EXTM3U
@@ -98,5 +98,43 @@ describe('uniquePlaylistName', () => {
     const existing = [{ name: 'Evim' } as Playlist, { name: 'Evim 2' } as Playlist];
     expect(uniquePlaylistName(existing, 'Evim')).toBe('Evim 3');
     expect(uniquePlaylistName(existing, 'Ofis')).toBe('Ofis');
+  });
+});
+
+describe('withProxy', () => {
+  const target = 'http://sunucu.com:8080/live/1.m3u8';
+
+  it('proxy tanimli degilse adresi degistirmez', () => {
+    expect(withProxy(target)).toBe(target);
+    expect(withProxy(target, '   ')).toBe(target);
+  });
+
+  it('sonda hazir parametre varsa ikinci bir parametre eklemez', () => {
+    expect(withProxy(target, 'http://localhost:8787/proxy?url=')).toBe(
+      `http://localhost:8787/proxy?url=${encodeURIComponent(target)}`,
+    );
+    expect(withProxy(target, 'http://localhost:8787/proxy?a=1&url=')).toBe(
+      `http://localhost:8787/proxy?a=1&url=${encodeURIComponent(target)}`,
+    );
+  });
+
+  it('parametresiz adrese url parametresi ekler', () => {
+    expect(withProxy(target, 'http://localhost:8787/proxy')).toBe(
+      `http://localhost:8787/proxy?url=${encodeURIComponent(target)}`,
+    );
+    expect(withProxy(target, 'http://localhost:8787/proxy?token=abc')).toBe(
+      `http://localhost:8787/proxy?token=abc&url=${encodeURIComponent(target)}`,
+    );
+  });
+
+  it('{url} yer tutucusunu doldurur', () => {
+    expect(withProxy(target, 'http://localhost:8787/get/{url}/raw')).toBe(
+      `http://localhost:8787/get/${encodeURIComponent(target)}/raw`,
+    );
+  });
+
+  it('zaten sarilmis adresi tekrar sarmaz', () => {
+    const wrapped = withProxy(target, 'http://localhost:8787/proxy?url=');
+    expect(withProxy(wrapped, 'http://localhost:8787/proxy?url=')).toBe(wrapped);
   });
 });

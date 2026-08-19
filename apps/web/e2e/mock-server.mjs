@@ -11,7 +11,7 @@ const VIDEO = readFileSync(new URL('./fixtures-video.webm', import.meta.url));
 
 const M3U = `#EXTM3U url-tvg="http://127.0.0.1:8899/xmltv"
 #EXTINF:-1 tvg-id="trt1.tr" tvg-name="TRT 1" tvg-logo="http://127.0.0.1:8899/logo.png" group-title="Ulusal" tvg-chno="1",TRT 1 HD
-http://127.0.0.1:8899/live/1.m3u8
+http://127.0.0.1:8899/nocors/live/1.ts
 #EXTINF:-1 tvg-id="beinsports1.tr" group-title="Spor",beIN SPORTS 1 FHD
 http://127.0.0.1:8899/live/2.m3u8
 #EXTINF:7200 group-title="Filmler",Inception (2010)
@@ -38,9 +38,36 @@ const XMLTV = `<?xml version="1.0" encoding="UTF-8"?>
   <programme start="${stamp(-15)}" stop="${stamp(75)}" channel="beinsports1.tr"><title>Derbi</title></programme>
 </tv>`;
 
+/** Gelen istekleri testlerin inceleyebilmesi icin kaydeder. */
+const requestLog = [];
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1:8899');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  requestLog.push(url.pathname);
+
+  // "/nocors/..." uclari bilerek CORS basligi gondermez: cogu IPTV
+  // saglayicisi boyle davranir ve tarayici XHR ile indirmeyi reddeder.
+  if (!url.pathname.startsWith('/nocors/')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+
+  if (url.pathname === '/__requests') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify(requestLog));
+    return;
+  }
+  if (url.pathname.endsWith('/live/1.m3u8')) {
+    res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl' });
+    res.end(`#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:2\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:2.0,\nsegment0.ts\n#EXTINF:2.0,\nsegment1.ts\n`);
+    return;
+  }
+  if (url.pathname.endsWith('.ts')) {
+    // Cozulebilir bir aksis degil; testler ag katmanini dogruluyor.
+    res.writeHead(200, { 'Content-Type': 'video/mp2t' });
+    res.end(Buffer.alloc(4096, 0x47));
+    return;
+  }
+
   if (url.pathname === '/get.php') {
     res.writeHead(200, { 'Content-Type': 'audio/x-mpegurl' });
     res.end(M3U);

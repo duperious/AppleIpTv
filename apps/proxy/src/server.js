@@ -40,11 +40,27 @@ const HOP_BY_HOP = new Set([
   'host',
 ]);
 
+/** Tarayicinin yaniti okuyabilmesi icin gereken basliklar. */
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS',
+  'Access-Control-Allow-Headers': '*',
+  'Access-Control-Expose-Headers': 'Content-Length,Content-Range,Content-Type,Accept-Ranges',
+};
+
 function setCors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', '*');
-  res.setHeader('Access-Control-Expose-Headers', 'Content-Length,Content-Range,Content-Type,Accept-Ranges');
+  if (res.headersSent) return;
+  for (const [key, value] of Object.entries(CORS_HEADERS)) res.setHeader(key, value);
+}
+
+/** Basliklar gonderildikten sonra yazmaya calisip sunucuyu dusurmemek icin. */
+function fail(res, status, message) {
+  if (res.headersSent) {
+    res.destroy();
+    return;
+  }
+  res.writeHead(status, { ...CORS_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end(message);
 }
 
 function isAllowed(target) {
@@ -71,15 +87,13 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (requestUrl.pathname !== '/proxy') {
-    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('Kullanim: /proxy?url=<hedef-adres>');
+    fail(res, 404, 'Kullanim: /proxy?url=<hedef-adres>');
     return;
   }
 
   const raw = requestUrl.searchParams.get('url');
   if (!raw) {
-    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('url parametresi gerekli');
+    fail(res, 400, 'url parametresi gerekli');
     return;
   }
 
@@ -87,20 +101,17 @@ const server = http.createServer(async (req, res) => {
   try {
     target = new URL(raw);
   } catch {
-    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('Gecersiz adres');
+    fail(res, 400, 'Gecersiz adres');
     return;
   }
 
   if (!/^https?:$/.test(target.protocol)) {
-    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('Yalnizca http/https desteklenir');
+    fail(res, 400, 'Yalnizca http/https desteklenir');
     return;
   }
 
   if (!isAllowed(target)) {
-    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('Bu alan adi ALLOWED_HOSTS listesinde degil');
+    fail(res, 403, 'Bu alan adi ALLOWED_HOSTS listesinde degil');
     return;
   }
 
@@ -127,29 +138,41 @@ const server = http.createServer(async (req, res) => {
       signal: controller.signal,
     });
 
-    const outHeaders = {};
+    const outHeaders = { ...CORS_HEADERS };
     upstream.headers.forEach((value, key) => {
       if (!HOP_BY_HOP.has(key.toLowerCase()) && !key.toLowerCase().startsWith('access-control-')) {
         outHeaders[key] = value;
       }
     });
 
+    // CORS basliklari writeHead ile birlikte gonderilmeli; sonradan
+    // setHeader cagirmak "headers already sent" hatasi uretir.
     res.writeHead(upstream.status, outHeaders);
-    setCors(res);
 
     if (!upstream.body || req.method === 'HEAD') {
       res.end();
       return;
     }
-    Readable.fromWeb(upstream.body).pipe(res);
+
+    const stream = Readable.fromWeb(upstream.body);
+    // Yayin ortasinda kopan baglantilar sureci dusurmemeli.
+    stream.on('error', () => res.destroy());
+    res.on('close', () => stream.destroy());
+    stream.pipe(res);
   } catch (error) {
     if (controller.signal.aborted) {
       res.destroy();
       return;
     }
-    res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end(`Hedefe ulasilamadi: ${error instanceof Error ? error.message : String(error)}`);
+    fail(res, 502, `Hedefe ulasilamadi: ${error instanceof Error ? error.message : String(error)}`);
   }
+});
+
+server.on('clientError', (_error, socket) => socket.destroy());
+// Tek bir bozuk istek yuzunden proxy'nin kapanmasi, kullanicinin tum
+// yayinlarinin durmasi anlamina gelir; bu yuzden surec ayakta tutuluyor.
+process.on('uncaughtException', (error) => {
+  console.error('Beklenmeyen hata (surec devam ediyor):', error?.message ?? error);
 });
 
 server.listen(PORT, HOST, () => {

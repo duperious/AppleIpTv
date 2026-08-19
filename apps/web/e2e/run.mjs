@@ -56,9 +56,12 @@ process.on('exit', cleanup);
 process.on('SIGINT', () => { cleanup(); process.exit(130); });
 
 start(process.execPath, [resolve(here, 'mock-server.mjs')]);
+// Canli yayin senaryosu CORS proxy'sini de kullanir.
+start(process.execPath, [resolve(webRoot, '..', 'proxy', 'src', 'server.js')]);
 start('npx', ['vite', 'preview', '--port', '4173', '--host', '127.0.0.1'], { cwd: webRoot });
 
 await waitFor('http://127.0.0.1:8899/get.php');
+await waitFor('http://127.0.0.1:8787/health');
 await waitFor(BASE_URL);
 
 // PLAYWRIGHT_CHROMIUM_PATH, hazir bir Chromium bulunan ortamlarda

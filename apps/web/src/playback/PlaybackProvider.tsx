@@ -33,6 +33,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const saveProgress = useApp((state) => state.saveProgress);
   const pushRecentChannel = useApp((state) => state.pushRecentChannel);
   const profile = useActiveProfile();
+  const proxyUrl = useApp((state) => state.settings.proxyUrl);
 
   const play = useCallback(
     (request: PlayRequest) => {
@@ -79,6 +80,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
           subtitle={current.subtitle}
           live={current.live}
           liveBufferSecs={profile?.settings.liveBufferSecs ?? 6}
+          proxyUrl={proxyUrl || undefined}
           startPositionSecs={current.startPositionSecs}
           onClose={stop}
           onChannelStep={current.channelRing ? stepChannel : undefined}

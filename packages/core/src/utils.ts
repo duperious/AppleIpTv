@@ -61,13 +61,30 @@ export interface FetchOptions {
   signal?: AbortSignal;
 }
 
-/** Proxy ayarliysa hedef adresi proxy'ye sarar. */
+/**
+ * Proxy ayarliysa hedef adresi proxy'ye sarar.
+ *
+ * Uc bicim desteklenir:
+ * - `https://proxy/?target={url}` : yer tutucu dogrudan doldurulur
+ * - `https://proxy/proxy?url=`    : sonda parametre varsa adres eklenir
+ * - `https://proxy/proxy`         : parametre yoksa `?url=` eklenir
+ *
+ * Zaten sarilmis adresler tekrar sarilmaz; boylece art arda cagrilar
+ * ic ice proxy adresleri uretmez.
+ */
 export function withProxy(url: string, proxyUrl?: string): string {
   if (!proxyUrl) return url;
-  const base = proxyUrl.includes('{url}')
-    ? proxyUrl.replace('{url}', encodeURIComponent(url))
-    : `${proxyUrl}${proxyUrl.includes('?') ? '&' : '?'}url=${encodeURIComponent(url)}`;
-  return base;
+  const trimmed = proxyUrl.trim();
+  if (!trimmed) return url;
+  if (url.startsWith(trimmed) || (trimmed.includes('{url}') && url.startsWith(trimmed.split('{url}')[0]!))) {
+    return url;
+  }
+  if (trimmed.includes('{url}')) return trimmed.replace('{url}', encodeURIComponent(url));
+  // "...?url=" veya "...&url=" gibi hazir bir parametre ile bitiyorsa
+  // ikinci bir parametre eklemeden dogrudan tamamlariz.
+  if (/[?&][^=&]+=$/.test(trimmed)) return `${trimmed}${encodeURIComponent(url)}`;
+  const separator = trimmed.includes('?') ? '&' : '?';
+  return `${trimmed}${separator}url=${encodeURIComponent(url)}`;
 }
 
 /** Zaman asimi + proxy destekli fetch. Hata durumunda anlamli mesaj firlatir. */
