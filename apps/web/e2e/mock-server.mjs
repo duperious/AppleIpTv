@@ -16,6 +16,8 @@ const M3U = `#EXTM3U url-tvg="http://127.0.0.1:8899/xmltv"
 http://127.0.0.1:8899/nocors/live/1.ts
 #EXTINF:-1 tvg-id="beinsports1.tr" tvg-logo="${art('beIN 1', true)}" group-title="Spor" tvg-chno="53",beIN SPORTS 1 FHD
 http://127.0.0.1:8899/live/2.m3u8
+#EXTINF:-1 tvg-id="zor.tr" tvg-logo="${art('Zorlu', true)}" group-title="Spor" tvg-chno="99",Zorlu Saglayici HD
+http://127.0.0.1:8899/hostile/live/1.m3u8
 #EXTINF:7200 tvg-logo="${art('Inception')}" group-title="Filmler",Inception (2010)
 http://127.0.0.1:8899/movie/10.webm
 #EXTINF:6900 tvg-logo="${art('Interstellar')}" group-title="Filmler",Interstellar (2014)
@@ -72,6 +74,42 @@ const server = http.createServer((req, res) => {
   // saglayicisi boyle davranir ve tarayici XHR ile indirmeyi reddeder.
   if (!url.pathname.startsWith('/nocors/')) {
     res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+
+  // --- Gercek dunyadaki zorlu saglayici davranislari -----------------
+  // CORS basligi yok, tarayici User-Agent'i reddediliyor, adres baska bir
+  // yola yonlendiriliyor ve oynatma listeleri goreli adresler iceriyor.
+  if (url.pathname.startsWith('/hostile/')) {
+    const agent = String(req.headers['user-agent'] ?? '');
+    if (/Mozilla|Chrome|Safari/i.test(agent) && !/VLC|Lavf|Kodi/i.test(agent)) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('forbidden user agent');
+      return;
+    }
+    if (url.pathname === '/hostile/live/1.m3u8') {
+      // Panellerin siklikla yaptigi gibi baska bir yola yonlendir.
+      res.writeHead(302, { Location: '/hostile/cdn/edge7/master.m3u8' });
+      res.end();
+      return;
+    }
+    if (url.pathname === '/hostile/cdn/edge7/master.m3u8') {
+      res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl' });
+      res.end('#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1200000,RESOLUTION=1280x720\nv1/index.m3u8\n');
+      return;
+    }
+    if (url.pathname === '/hostile/cdn/edge7/v1/index.m3u8') {
+      res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl' });
+      res.end('#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:2\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:2.0,\nseg0.ts\n#EXTINF:2.0,\nseg1.ts\n');
+      return;
+    }
+    if (url.pathname.endsWith('.ts')) {
+      res.writeHead(200, { 'Content-Type': 'video/mp2t' });
+      res.end(Buffer.alloc(4096, 0x47));
+      return;
+    }
+    res.writeHead(404);
+    res.end('yok');
+    return;
   }
 
   if (url.pathname.startsWith('/art/')) {

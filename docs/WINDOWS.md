@@ -156,6 +156,8 @@ Sunucu adresini `http://sunucu.com:8080` bicimine getirin (sonda `/` olmasin).
 **Filmler oynuyor ama canli yayinlar acilmiyor**
 Proxy penceresi acik degil veya Ayarlar'da proxy adresi tanimli degil.
 Canli yayinlar tarayicida yalnizca proxy uzerinden indirilebilir.
+Emin olmak icin **Ayarlar > Yayin tanilama** bolumunden kanali test edin;
+hangi adimda takildigini adim adim gosterir.
 
 **Kanal aciliyor ama goruntu yok**
 - Xtream kaynaklarinda **Ayarlar > Gelismis > "HLS tercih et"** secenegini acin.

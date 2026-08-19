@@ -22,6 +22,13 @@ import { Readable } from 'node:stream';
 
 const PORT = Number(process.env['PORT'] ?? 8787);
 const HOST = process.env['HOST'] ?? '127.0.0.1';
+/**
+ * Cogu IPTV saglayicisi tarayici User-Agent'ini reddeder (403) ve yalnizca
+ * oynatici istemcilerine yanit verir. Istemci kendi degerini
+ * X-Forward-User-Agent basligiyla gonderebilir.
+ */
+const UPSTREAM_USER_AGENT = process.env['UPSTREAM_USER_AGENT'] ?? 'VLC/3.0.20 LibVLC/3.0.20';
+
 /** Bos birakilirsa tum hedeflere izin verilir; virgulle ayrilmis alan adi listesi verilebilir. */
 const ALLOWED_HOSTS = (process.env['ALLOWED_HOSTS'] ?? '')
   .split(',')
@@ -67,6 +74,54 @@ function isAllowed(target) {
   if (ALLOWED_HOSTS.length === 0) return true;
   const hostname = target.hostname.toLowerCase();
   return ALLOWED_HOSTS.some((allowed) => hostname === allowed || hostname.endsWith(`.${allowed}`));
+}
+
+
+/** Yanit bir HLS oynatma listesi mi? */
+function isPlaylist(upstream, target) {
+  const type = (upstream.headers.get('content-type') ?? '').toLowerCase();
+  if (type.includes('mpegurl') || type.includes('x-mpegurl')) return true;
+  const path = (upstream.url || target.href).split('?')[0].toLowerCase();
+  return path.endsWith('.m3u8') || path.endsWith('.m3u');
+}
+
+/** Istemcinin gordugu proxy adresi ("http://host:port/proxy?url="). */
+function publicProxyBase(req) {
+  const host = req.headers.host ?? `${HOST}:${PORT}`;
+  return `http://${host}/proxy?url=`;
+}
+
+/**
+ * HLS oynatma listesindeki tum adresleri mutlaklastirip proxy'ye sarar.
+ * Yorum satirlarindaki URI="..." alanlari (anahtar, altyazi, ses parcalari)
+ * da kapsanir.
+ */
+function rewritePlaylist(body, finalUrl, proxyBase) {
+  const wrap = (value) => {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.startsWith('#')) return value;
+    if (trimmed.startsWith(proxyBase)) return trimmed;
+    let absolute;
+    try {
+      absolute = new URL(trimmed, finalUrl).href;
+    } catch {
+      return value;
+    }
+    return `${proxyBase}${encodeURIComponent(absolute)}`;
+  };
+
+  return body
+    .split(/\r?\n/)
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return line;
+      if (trimmed.startsWith('#')) {
+        // #EXT-X-KEY:URI="...", #EXT-X-MEDIA:URI="..." gibi alanlar
+        return line.replace(/URI="([^"]+)"/g, (_match, uri) => `URI="${wrap(uri)}"`);
+      }
+      return wrap(trimmed);
+    })
+    .join('\n');
 }
 
 const server = http.createServer(async (req, res) => {
@@ -125,7 +180,9 @@ const server = http.createServer(async (req, res) => {
     if (typeof value === 'string') headers[key] = value;
   }
   const forwardedAgent = req.headers['x-forward-user-agent'];
-  if (typeof forwardedAgent === 'string') headers['user-agent'] = forwardedAgent;
+  headers['user-agent'] = typeof forwardedAgent === 'string' && forwardedAgent
+    ? forwardedAgent
+    : UPSTREAM_USER_AGENT;
 
   const controller = new AbortController();
   req.on('close', () => controller.abort());
@@ -144,16 +201,32 @@ const server = http.createServer(async (req, res) => {
         outHeaders[key] = value;
       }
     });
-
-    // CORS basliklari writeHead ile birlikte gonderilmeli; sonradan
-    // setHeader cagirmak "headers already sent" hatasi uretir.
-    res.writeHead(upstream.status, outHeaders);
+    // Yonlendirme sonrasi gercek adres; istemci tarafi tanilamada gosterilir.
+    outHeaders['X-Final-Url'] = upstream.url || target.href;
+    outHeaders['X-AppleIpTv-Proxy'] = '1';
 
     if (!upstream.body || req.method === 'HEAD') {
+      res.writeHead(upstream.status, outHeaders);
       res.end();
       return;
     }
 
+    // Oynatma listeleri metin olarak yeniden yazilir: icindeki goreli
+    // adresler yonlendirme sonrasi gercek adrese gore mutlaklastirilir ve
+    // proxy'ye sarilir. Boylece hem 302 yonlendirmeleri hem de goreli
+    // parca adresleri dogru cozulur.
+    if (isPlaylist(upstream, target)) {
+      const body = await upstream.text();
+      const rewritten = rewritePlaylist(body, upstream.url || target.href, publicProxyBase(req));
+      delete outHeaders['content-length'];
+      delete outHeaders['Content-Length'];
+      delete outHeaders['content-encoding'];
+      res.writeHead(upstream.status, outHeaders);
+      res.end(rewritten);
+      return;
+    }
+
+    res.writeHead(upstream.status, outHeaders);
     const stream = Readable.fromWeb(upstream.body);
     // Yayin ortasinda kopan baglantilar sureci dusurmemeli.
     stream.on('error', () => res.destroy());
@@ -177,6 +250,7 @@ process.on('uncaughtException', (error) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`AppleIpTv proxy calisiyor: http://${HOST}:${PORT}/proxy?url=`);
+  console.log(`Hedefe gonderilen User-Agent: ${UPSTREAM_USER_AGENT}`);
   if (ALLOWED_HOSTS.length > 0) console.log(`Izinli alan adlari: ${ALLOWED_HOSTS.join(', ')}`);
   else console.log('Uyari: ALLOWED_HOSTS bos, tum hedeflere izin veriliyor. Sunucuyu internete acmayin.');
 });

@@ -1363,3 +1363,57 @@ input[type='checkbox'] { width: 17px; height: 17px; }
 @media (min-width: 1500px) {
   .episodes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: none; }
 }
+
+/* ------------------------------------------------------------- Tanilama */
+
+.diagnostics { display: flex; flex-direction: column; gap: 16px; }
+.diagnostics__actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.diagnostics__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.diagnostics__step {
+  display: flex;
+  gap: 13px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  align-items: flex-start;
+}
+
+.diagnostics__step strong { font-size: 14px; font-weight: 580; }
+.diagnostics__step p { margin: 2px 0 0; font-size: 13px; color: var(--text-soft); word-break: break-word; }
+.diagnostics__hint { color: var(--text-dim) !important; font-style: italic; }
+
+.diagnostics__icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--surface-3);
+}
+
+.diagnostics__step.is-ok .diagnostics__icon { background: rgba(52, 199, 89, 0.22); color: #34c759; }
+.diagnostics__step.is-warn .diagnostics__icon { background: rgba(255, 209, 102, 0.2); color: #ffd166; }
+.diagnostics__step.is-fail .diagnostics__icon { background: var(--live-soft); color: var(--live); }
+.diagnostics__step.is-fail { border-color: color-mix(in srgb, var(--live) 45%, transparent); }
+
+/* Oynatici uzerinde gosterildiginde */
+.diagnostics--compact {
+  width: min(720px, 92vw);
+  max-height: 52vh;
+  overflow-y: auto;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: rgba(10, 11, 16, 0.92);
+  border: 1px solid var(--border-strong);
+  backdrop-filter: blur(20px);
+  text-align: left;
+}
+
+.diagnostics--compact .diagnostics__step { background: rgba(255, 255, 255, 0.05); }
+
+.player__diagnostics { pointer-events: auto; }

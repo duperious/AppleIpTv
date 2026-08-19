@@ -47,7 +47,7 @@ export async function m3uFlow(page, baseURL) {
   await page.waitForSelector('.channel');
   const channels = await page.locator('.channel').allTextContents();
   log('kanallar:', channels.length);
-  if (channels.length !== 2) throw new Error(`Beklenen 2 kanal, gelen ${channels.length}`);
+  if (channels.length !== 3) throw new Error(`Beklenen 3 kanal, gelen ${channels.length}`);
   if (!channels.join(' ').includes('Ana Haber')) throw new Error('EPG bilgisi kanal listesinde gorunmuyor');
 
   await page.getByRole('link', { name: 'Rehber' }).click();
@@ -215,9 +215,59 @@ export async function liveFlow(page, baseURL) {
   log('.ts -> .m3u8 gecisi ve parca indirme dogrulandi');
 }
 
+/**
+ * Gercek dunyada sik karsilasilan zorlu saglayici: CORS basligi gondermez,
+ * tarayici User-Agent'ini 403 ile reddeder, adresi baska bir yola
+ * yonlendirir ve oynatma listeleri goreli adresler icerir.
+ */
+export async function hostileProviderFlow(page, baseURL) {
+  await createProfile(page, baseURL, 'Zorlu');
+  await addM3USource(page, baseURL, 'http://127.0.0.1:8899/get.php');
+
+  await page.getByRole('link', { name: 'Ayarlar' }).click();
+  await page.locator('label:has-text("CORS proxy adresi") input').fill('http://127.0.0.1:8787/proxy?url=');
+  await page.waitForTimeout(400);
+
+  // Tanilama tum adimlarda basarili olmali.
+  await page.locator('label:has-text("Test edilecek kanal") select').selectOption({ label: 'Zorlu Saglayici HD' });
+  await page.getByRole('button', { name: 'Yayini test et' }).click();
+  await page.waitForSelector('.diagnostics__step', { timeout: 40_000 });
+  await page.waitForFunction(
+    () => document.querySelectorAll('.diagnostics__step').length >= 5,
+    { timeout: 40_000 },
+  );
+  const failed = await page.locator('.diagnostics__step.is-fail').allTextContents();
+  const results = await page.locator('.diagnostics__step strong').allTextContents();
+  log('tanilama adimlari:', results.join(', '));
+  if (failed.length > 0) throw new Error(`Tanilama basarisiz adim(lar): ${failed.join(' | ')}`);
+
+  // Oynatma: yonlendirme + goreli adresler cozulup parcalar inmeli.
+  await page.getByRole('link', { name: 'Canli TV' }).click();
+  await page.waitForSelector('.channel');
+  await page.getByRole('button', { name: /Zorlu Saglayici HD/ }).first().click();
+  await page.evaluate(() => performance.clearResourceTimings());
+  await page.locator('.live__detail button.btn--primary').click();
+  await page.waitForSelector('.player__video');
+
+  await page.waitForFunction(
+    () =>
+      performance
+        .getEntriesByType('resource')
+        .some((entry) => entry.name.includes('/proxy?url=') && decodeURIComponent(entry.name).includes('seg0.ts')),
+    { timeout: 40_000 },
+  );
+  log('yonlendirme sonrasi parcalar indirildi');
+
+  const status = await page.locator('.player__status-text').textContent().catch(() => null);
+  if (status && /CORS|acilamadi|indirilemedi/i.test(status)) {
+    throw new Error(`Oynatici hata gosteriyor: ${status}`);
+  }
+}
+
 export const scenarios = [
   { name: 'M3U akisi', run: m3uFlow },
   { name: 'Xtream akisi', run: xtreamFlow },
   { name: 'Oynatma ve ilerleme', run: playbackFlow },
   { name: 'Canli yayin ve proxy', run: liveFlow },
+  { name: 'Zorlu saglayici (yonlendirme + UA)', run: hostileProviderFlow },
 ];

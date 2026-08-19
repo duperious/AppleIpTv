@@ -36,9 +36,42 @@ npm run proxy
 # Ayarlar > Gelismis > CORS proxy adresi:  http://localhost:8787/proxy?url=
 ```
 
-Oynatici, yayin acilmadiginda ekranda sebebini yazar ve "Yeniden dene"
-sunar. Canli bir `.ts` adresi acilmazsa ayni yayinin `.m3u8` bicimi
-otomatik denenir.
+### Yayin tanilama (once bunu calistirin)
+
+Yayin hala acilmiyorsa tahmin yurutmeyin: **Ayarlar > Yayin tanilama**
+bolumunden kanali secip **"Yayini test et"** deyin. Ayni araca oynaticidaki
+hata ekranindaki **"Neden acilmadi?"** dugmesinden de ulasabilirsiniz.
+
+Arac su zinciri sirayla dener ve nerede kirildigini gosterir:
+
+| Adim | Ne kontrol edilir |
+| --- | --- |
+| Sayfa guvenligi | https sayfadan http yayin cekilmeye calisiliyor mu (karisik icerik) |
+| Oynatma motoru | hls.js / mpegts.js / tarayici oynaticisi - hangisi secildi |
+| CORS proxy | Tanimli mi, calisiyor mu |
+| Dogrudan erisim | Saglayici tarayiciya dogrudan yanit veriyor mu |
+| Proxy uzerinden erisim | HTTP kodu, donen icerik gercekten yayin mi (yoksa HTML hata sayfasi mi) |
+| Yayin parcasi | Oynatma listesindeki ilk parca gercekten iniyor mu |
+
+"Sonucu kopyala" ile ciktiyi panoya alip paylasabilirsiniz.
+
+### Oynaticinin kendi kurtarma davranislari
+
+- Otomatik oynatma engellenirse yayin sessiz baslatilir ve "Sesi ac" sunulur.
+- Hata ekraninda "Yeniden dene" motoru bastan kurar.
+- Canli bir `.ts` adresi acilmazsa ayni yayinin `.m3u8` bicimi (ve tersi)
+  otomatik denenir.
+
+### Proxy'nin saglayici uyumlulugu icin yaptiklari
+
+- **Oynatici kimligi:** Cogu saglayici tarayici User-Agent'ini 403 ile
+  reddeder. Proxy hedefe varsayilan olarak `VLC/3.0.20 LibVLC/3.0.20`
+  gonderir. Degistirmek icin:
+  `UPSTREAM_USER_AGENT="Kodi/20" npm run proxy`
+- **Yonlendirmeler ve goreli adresler:** Paneller `/live/...m3u8` adresini
+  sik sik baska bir sunucuya yonlendirir ve oynatma listeleri goreli
+  adresler icerir. Proxy, listeleri yonlendirme sonrasi gercek adrese gore
+  yeniden yazar; boylece parcalar dogru yerden indirilir.
 
 Apple TV uygulamasinda bu sinirlama yoktur; proxy gerekmez.
 

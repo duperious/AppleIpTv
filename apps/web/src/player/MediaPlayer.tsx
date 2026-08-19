@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { attachEngine, playbackCandidates } from './engine';
 import type { EngineHandle } from './engine';
 import { formatPosition } from '../lib/format';
+import { Diagnostics } from '../components/Diagnostics';
 import {
   BackIcon,
   FullscreenIcon,
@@ -70,6 +71,7 @@ export function MediaPlayer(props: MediaPlayerProps) {
   const [levels, setLevels] = useState<{ index: number; label: string }[]>([]);
   const [currentLevel, setCurrentLevel] = useState(-1);
   const [showSettings, setShowSettings] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   /** Otomatik oynatma icin sesi kapatmak zorunda kaldik mi? */
   const [autoMuted, setAutoMuted] = useState(false);
   /**
@@ -391,14 +393,24 @@ export function MediaPlayer(props: MediaPlayerProps) {
         <div className="player__status">
           <div className={`player__status-text ${fatal ? 'player__status-text--error' : ''}`}>{status}</div>
           {fatal && (
-            <div className="player__status-actions">
-              <button type="button" className="btn btn--primary" onClick={retry}>
-                Yeniden dene
-              </button>
-              <button type="button" className="btn" onClick={onClose}>
-                Geri don
-              </button>
-            </div>
+            <>
+              <div className="player__status-actions">
+                <button type="button" className="btn btn--primary" onClick={retry}>
+                  Yeniden dene
+                </button>
+                <button type="button" className="btn" onClick={() => setShowDiagnostics((value) => !value)}>
+                  {showDiagnostics ? 'Tanilamayi gizle' : 'Neden acilmadi?'}
+                </button>
+                <button type="button" className="btn" onClick={onClose}>
+                  Geri don
+                </button>
+              </div>
+              {showDiagnostics && (
+                <div className="player__diagnostics">
+                  <Diagnostics url={activeUrl} proxyUrl={proxyUrl} compact />
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

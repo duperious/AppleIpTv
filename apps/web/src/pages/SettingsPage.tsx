@@ -4,6 +4,7 @@ import { categoriesOfKind, setPin as setProfilePin, verifyPin } from '@appleiptv
 import type { MediaKind } from '@appleiptv/core';
 import { useActiveProfile, useApp, useCatalog } from '../store/useApp';
 import { idbStore } from '../store/db';
+import { Diagnostics } from '../components/Diagnostics';
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export function SettingsPage() {
   const [oldPin, setOldPin] = useState('');
   const [pinMessage, setPinMessage] = useState<string | undefined>();
   const [categoryKind, setCategoryKind] = useState<MediaKind>('live');
+  const [testChannelId, setTestChannelId] = useState('');
 
   const categories = useMemo(() => categoriesOfKind(catalog, categoryKind), [catalog, categoryKind]);
   const hiddenIds = new Set(profile?.settings.hiddenCategoryIds ?? []);
@@ -209,6 +211,31 @@ export function SettingsPage() {
         </ul>
         {categories.length === 0 && <p className="form__hint">Bu turde kategori yok.</p>}
       </section>
+
+      {catalog.live.length > 0 && (
+        <section className="card-panel">
+          <h2>Yayin tanilama</h2>
+          <p className="form__hint">
+            Canli yayin acilmiyorsa bir kanal secip test edin; hangi adimda takildigi adim adim gosterilir.
+          </p>
+          <label className="form__row">
+            <span>Test edilecek kanal</span>
+            <select
+              className="input"
+              value={testChannelId || catalog.live[0]!.id}
+              onChange={(event) => setTestChannelId(event.target.value)}
+            >
+              {catalog.live.slice(0, 200).map((channel) => (
+                <option key={channel.id} value={channel.id}>{channel.name}</option>
+              ))}
+            </select>
+          </label>
+          <Diagnostics
+            url={(catalog.live.find((channel) => channel.id === testChannelId) ?? catalog.live[0]!).url}
+            proxyUrl={settings.proxyUrl || undefined}
+          />
+        </section>
+      )}
 
       <section className="card-panel">
         <h2>Gelismis</h2>

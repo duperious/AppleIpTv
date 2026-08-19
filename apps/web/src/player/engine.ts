@@ -58,24 +58,34 @@ export function detectEngine(url: string, live = false): EngineKind {
   return 'native';
 }
 
+/** Adresin uzantisini degistirir: `.../12345.ts` -> `.../12345.m3u8`. */
+function withExtension(url: string, from: RegExp, to: string): string | undefined {
+  const [base, query] = url.split('?');
+  if (!base || !from.test(base)) return undefined;
+  return base.replace(from, to) + (query ? `?${query}` : '');
+}
+
 /** `.../12345.ts` -> `.../12345.m3u8`. Xtream tarzi adreslerde ise yarar. */
 export function toHlsVariant(url: string): string | undefined {
-  const [base, query] = url.split('?');
-  if (!base || !/\.(ts|mpegts)$/i.test(base)) return undefined;
-  return base.replace(/\.(ts|mpegts)$/i, '.m3u8') + (query ? `?${query}` : '');
+  return withExtension(url, /\.(ts|mpegts)$/i, '.m3u8');
+}
+
+/** `.../12345.m3u8` -> `.../12345.ts`. Yalnizca TS sunan hesaplar icin. */
+export function toTsVariant(url: string): string | undefined {
+  return withExtension(url, /\.m3u8$/i, '.ts');
 }
 
 /**
  * Yayin acilmadiginda sirayla denenecek adresler.
- * Ilk adres her zaman kullanicinin sectigi adrestir.
+ *
+ * Ilk adres her zaman kullanicinin sectigi adrestir. Saglayicilar ayni
+ * kanali kimi zaman yalnizca HLS, kimi zaman yalnizca MPEG-TS olarak
+ * sundugu icin canli yayinlarda diger bicim de denenir.
  */
 export function playbackCandidates(url: string, live: boolean): string[] {
-  const candidates = [url];
-  if (live) {
-    const hlsVariant = toHlsVariant(url);
-    if (hlsVariant) candidates.push(hlsVariant);
-  }
-  return candidates;
+  if (!live) return [url];
+  const alternate = toHlsVariant(url) ?? toTsVariant(url);
+  return alternate && alternate !== url ? [url, alternate] : [url];
 }
 
 /**
