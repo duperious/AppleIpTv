@@ -74,6 +74,11 @@ npm run proxy
    - **Xtream Codes**: saglayicinizin verdigi sunucu adresi, kullanici adi ve sifre.
    - **M3U adresi**: `http://sunucu:port/get.php?username=...&password=...&type=m3u_plus&output=m3u8`
    - **M3U dosyasi**: elinizde `.m3u` dosyasi varsa dogrudan yukleyin.
+> **Canli yayinlar icin proxy gerekir.** Film ve diziler proxy olmadan da
+> oynar; canli yayinlar tarayicinin CORS engeline takildigi icin
+> `npm run proxy` calisiyor olmali ve proxy adresi ayarlarda tanimli olmali.
+> Baslatma dosyasi (`AppleIpTv-Baslat.bat`) proxy'yi zaten acar.
+
 3. Kaynak eklenmiyorsa veya "Failed to fetch" hatasi aliyorsaniz:
    **Ayarlar > Gelismis > CORS proxy adresi** alanina
 
@@ -147,6 +152,10 @@ npm run dev -w @appleiptv/web -- --port 5200
 **Kaynak eklenmiyor, "Failed to fetch"**
 Proxy penceresi acik mi ve Ayarlar'daki proxy adresi dogru mu kontrol edin.
 Sunucu adresini `http://sunucu.com:8080` bicimine getirin (sonda `/` olmasin).
+
+**Filmler oynuyor ama canli yayinlar acilmiyor**
+Proxy penceresi acik degil veya Ayarlar'da proxy adresi tanimli degil.
+Canli yayinlar tarayicida yalnizca proxy uzerinden indirilebilir.
 
 **Kanal aciliyor ama goruntu yok**
 - Xtream kaynaklarinda **Ayarlar > Gelismis > "HLS tercih et"** secenegini acin.

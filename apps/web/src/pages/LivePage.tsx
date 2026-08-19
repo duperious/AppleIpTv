@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { categoriesOfKind, itemsInCategory, normalizeText, verifyPin } from '@appleiptv/core';
 import type { LiveChannel } from '@appleiptv/core';
 import { useActiveProfile, useApp, useCatalog, useHiddenCategoryIds, useCatalogIndex } from '../store/useApp';
-import { EmptyState, PinDialog, Poster } from '../components/ui';
+import { EmptyState, LiveProgress, PinDialog, Poster } from '../components/ui';
+import { LockIcon, PlayIcon, SearchIcon, StarIcon } from '../components/icons';
 import { usePlayback } from '../playback/PlaybackProvider';
 import { useEpg } from '../hooks/useEpg';
 import { formatClock } from '../lib/format';
@@ -77,11 +78,14 @@ export function LivePage() {
   return (
     <div className="live">
       <aside className="live__categories">
+        <span className="live__categories-title">Kategoriler</span>
         <button type="button" className={categoryId === ALL ? 'is-active' : ''} onClick={() => openCategory(ALL)}>
-          Tum kanallar <span>{catalog.live.length}</span>
+          <span className="live__category-name">Tum kanallar</span>
+          <span className="live__category-count">{catalog.live.length}</span>
         </button>
         <button type="button" className={categoryId === FAVORITES ? 'is-active' : ''} onClick={() => openCategory(FAVORITES)}>
-          Favoriler <span>{favorites.filter((entry) => entry.kind === 'live').length}</span>
+          <span className="live__category-name">Favoriler</span>
+          <span className="live__category-count">{favorites.filter((entry) => entry.kind === 'live').length}</span>
         </button>
         {categories.map((category) => (
           <button
@@ -90,19 +94,24 @@ export function LivePage() {
             className={categoryId === category.id ? 'is-active' : ''}
             onClick={() => openCategory(category.id)}
           >
-            {category.name}
-            <span>{lockedIds.has(category.id) ? '🔒' : index.itemsByCategory.get(category.id)?.length ?? 0}</span>
+            <span className="live__category-name">{category.name}</span>
+            <span className="live__category-count">
+              {lockedIds.has(category.id) ? <LockIcon size={14} /> : (index.itemsByCategory.get(category.id)?.length ?? 0)}
+            </span>
           </button>
         ))}
       </aside>
 
       <section className="live__list">
-        <input
-          className="input"
-          placeholder="Kanal ara"
-          value={filter}
-          onChange={(event) => setFilter(event.target.value)}
-        />
+        <label className="live__filter">
+          <SearchIcon size={17} />
+          <input
+            className="input input--bare"
+            placeholder="Kanal ara"
+            value={filter}
+            onChange={(event) => setFilter(event.target.value)}
+          />
+        </label>
         <ul>
           {channels.map((channel, position) => {
             const program = epg.now(channel);
@@ -131,23 +140,32 @@ export function LivePage() {
                   </div>
                   <div className="channel__text">
                     <strong>
-                      {channel.channelNumber ? `${channel.channelNumber} · ` : ''}
+                      {channel.channelNumber ? <span className="channel__number">{channel.channelNumber}</span> : null}
                       {channel.name}
                     </strong>
-                    {program && (
-                      <span className="channel__now">
-                        {formatClock(program.start)} {program.title}
-                      </span>
+                    {program ? (
+                      <>
+                        <span className="channel__now">
+                          <span className="channel__time">{formatClock(program.start)}</span>
+                          {program.title}
+                        </span>
+                        <LiveProgress start={program.start} stop={program.stop} />
+                      </>
+                    ) : (
+                      <span className="channel__now channel__now--empty">Rehber bilgisi yok</span>
                     )}
                   </div>
+                  <span className="channel__play" aria-hidden="true">
+                    <PlayIcon size={16} />
+                  </span>
                 </button>
                 <button
                   type="button"
-                  className="channel__fav"
+                  className={`channel__fav ${isFav ? 'is-active' : ''}`}
                   aria-label="Favori"
                   onClick={() => void toggleFavorite(channel)}
                 >
-                  {isFav ? '★' : '☆'}
+                  <StarIcon size={18} filled={isFav} />
                 </button>
               </li>
             );
@@ -169,6 +187,7 @@ export function LivePage() {
                 <span>
                   {formatClock(nowProgram.start)} - {formatClock(nowProgram.stop)}
                 </span>
+                <LiveProgress start={nowProgram.start} stop={nowProgram.stop} />
                 {nowProgram.description && <p>{nowProgram.description}</p>}
               </div>
             ) : (
@@ -191,7 +210,7 @@ export function LivePage() {
                 })
               }
             >
-              ▶ Izle
+              <PlayIcon size={18} /> Izle
             </button>
 
             {nextPrograms.length > 1 && (

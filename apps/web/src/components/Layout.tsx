@@ -1,23 +1,26 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useActiveProfile, useApp } from '../store/useApp';
+import { FilmIcon, GuideIcon, HomeIcon, SearchIcon, SeriesIcon, SettingsIcon, StarIcon, TvIcon } from './icons';
 
 const LINKS = [
-  { to: '/', label: 'Ana Sayfa', end: true },
-  { to: '/live', label: 'Canli TV' },
-  { to: '/guide', label: 'Rehber' },
-  { to: '/movies', label: 'Filmler' },
-  { to: '/series', label: 'Diziler' },
-  { to: '/favorites', label: 'Favoriler' },
+  { to: '/', label: 'Ana Sayfa', end: true, Icon: HomeIcon },
+  { to: '/live', label: 'Canli TV', Icon: TvIcon },
+  { to: '/guide', label: 'Rehber', Icon: GuideIcon },
+  { to: '/movies', label: 'Filmler', Icon: FilmIcon },
+  { to: '/series', label: 'Diziler', Icon: SeriesIcon },
+  { to: '/favorites', label: 'Favoriler', Icon: StarIcon },
 ];
 
 export function Layout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const profile = useActiveProfile();
   const sync = useApp((state) => state.sync);
   const error = useApp((state) => state.error);
   const setError = useApp((state) => state.setError);
   const [query, setQuery] = useState('');
+  const [scrolled, setScrolled] = useState(false);
 
   // "/" tusu aramaya odaklanir.
   useEffect(() => {
@@ -31,25 +34,38 @@ export function Layout() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Sayfa kaydirilinca ust cubuk yogunlasir.
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="topbar__brand" onClick={() => navigate('/')}>
-          <span className="topbar__logo">📺</span>
-          <span>AppleIpTv</span>
-        </div>
+      <header className={`topbar ${scrolled ? 'is-scrolled' : ''}`}>
+        <button type="button" className="topbar__brand" onClick={() => navigate('/')}>
+          <span className="topbar__logo" aria-hidden="true">
+            <TvIcon size={18} />
+          </span>
+          <span className="topbar__wordmark">AppleIpTv</span>
+        </button>
+
         <nav className="topbar__nav">
-          {LINKS.map((link) => (
+          {LINKS.map(({ to, label, end, Icon }) => (
             <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.end}
+              key={to}
+              to={to}
+              end={end}
               className={({ isActive }) => `topbar__link ${isActive ? 'is-active' : ''}`}
             >
-              {link.label}
+              <Icon size={17} />
+              <span>{label}</span>
             </NavLink>
           ))}
         </nav>
+
         <form
           className="topbar__search"
           onSubmit={(event) => {
@@ -57,34 +73,50 @@ export function Layout() {
             if (query.trim()) navigate(`/search?q=${encodeURIComponent(query.trim())}`);
           }}
         >
+          <SearchIcon size={17} className="topbar__search-icon" />
           <input
             id="global-search"
-            className="input"
-            placeholder="Ara ( / )"
+            className="input input--search"
+            placeholder="Ara"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
+          <kbd className="topbar__kbd">/</kbd>
         </form>
+
+        <NavLink
+          to="/settings"
+          className={({ isActive }) => `topbar__icon-link ${isActive ? 'is-active' : ''}`}
+          aria-label="Ayarlar"
+        >
+          <SettingsIcon size={19} />
+        </NavLink>
+
         <button type="button" className="topbar__profile" onClick={() => navigate('/profiles')}>
-          <span>{profile?.avatar ?? '👤'}</span>
+          <span className="topbar__avatar">{profile?.avatar ?? '👤'}</span>
           <span className="topbar__profile-name">{profile?.name ?? 'Profil'}</span>
         </button>
-        <NavLink to="/settings" className="topbar__link">Ayarlar</NavLink>
       </header>
 
-      {sync && (
-        <div className="banner banner--info">
-          {sync.stage} {sync.total > 1 ? `(${sync.done}/${sync.total})` : ''}
-        </div>
-      )}
-      {error && (
-        <div className="banner banner--error">
-          {error}
-          <button type="button" className="btn btn--ghost" onClick={() => setError(undefined)}>Kapat</button>
-        </div>
-      )}
+      <div className="toasts">
+        {sync && (
+          <div className="toast toast--info">
+            <span className="toast__spinner" />
+            {sync.stage}
+            {sync.total > 1 ? ` (${sync.done}/${sync.total})` : ''}
+          </div>
+        )}
+        {error && (
+          <div className="toast toast--error">
+            <span>{error}</span>
+            <button type="button" className="toast__close" onClick={() => setError(undefined)} aria-label="Kapat">
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
 
-      <main className="content">
+      <main className="content" key={location.pathname}>
         <Outlet />
       </main>
     </div>

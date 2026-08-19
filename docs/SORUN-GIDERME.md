@@ -18,6 +18,30 @@ Yalnizca kendi saglayicina izin vermek icin:
 ALLOWED_HOSTS=sunucum.com,cdn.sunucum.com npm run proxy
 ```
 
+### Filmler/diziler oynuyor ama canli yayinlar acilmiyor
+
+Bu, web surumunde en sik karsilasilan durumdur ve sebebi tarayicidir:
+
+- Film ve dizi dosyalari dogrudan `<video>` etiketiyle oynatilir; tarayici
+  bunlarda CORS denetimi yapmaz.
+- Canli yayinlar (HLS/MPEG-TS) parca parca **JavaScript ile** indirilir ve
+  CORS denetimine takilir. Cogu IPTV sunucusu `Access-Control-Allow-Origin`
+  basligi gondermedigi icin tarayici indirmeyi reddeder.
+
+Cozum: proxy'yi calistirin ve **Ayarlar > Gelismis > CORS proxy adresi**
+alanina adresini yazin.
+
+```bash
+npm run proxy
+# Ayarlar > Gelismis > CORS proxy adresi:  http://localhost:8787/proxy?url=
+```
+
+Oynatici, yayin acilmadiginda ekranda sebebini yazar ve "Yeniden dene"
+sunar. Canli bir `.ts` adresi acilmazsa ayni yayinin `.m3u8` bicimi
+otomatik denenir.
+
+Apple TV uygulamasinda bu sinirlama yoktur; proxy gerekmez.
+
 ### Kanal aciliyor ama goruntu yok
 - Xtream kaynaklarinda **Ayarlar > Gelismis > "HLS tercih et"** secenegini
   acin. Tarayicilar ham MPEG-TS akislarini `mpegts.js` ile oynatabilir ancak

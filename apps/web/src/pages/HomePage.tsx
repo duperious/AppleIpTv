@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { continueWatching, recentlyAdded } from '@appleiptv/core';
 import type { LiveChannel, MovieItem, SeriesItem } from '@appleiptv/core';
 import { useActiveProfile, useApp, useCatalog, useHiddenCategoryIds, useCatalogIndex } from '../store/useApp';
-import { Card, EmptyState, Rail } from '../components/ui';
+import { Card, EmptyState, Poster, Rail } from '../components/ui';
+import { PlayIcon, StarIcon } from '../components/icons';
 import { usePlayback } from '../playback/PlaybackProvider';
 import { useEpg } from '../hooks/useEpg';
 import { percent } from '../lib/format';
@@ -42,6 +43,16 @@ export function HomePage() {
   const newMovies = useMemo(() => visible(recentlyAdded(catalog, 'movie', 24) as MovieItem[]), [catalog, visible]);
   const newSeries = useMemo(() => visible(recentlyAdded(catalog, 'series', 24) as SeriesItem[]), [catalog, visible]);
 
+  /**
+   * One cikan icerik: gorseli olan, puani en yuksek yeni film veya dizi.
+   * Katalogda hicbiri yoksa kahraman bolumu gizlenir.
+   */
+  const featured = useMemo(() => {
+    const pool = [...newMovies, ...newSeries].filter((item) => item.logo || item.backdrop);
+    if (pool.length === 0) return undefined;
+    return pool.slice(0, 12).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0];
+  }, [newMovies, newSeries]);
+
   if (playlists.length === 0) {
     return (
       <EmptyState
@@ -54,6 +65,70 @@ export function HomePage() {
 
   return (
     <div className="page">
+      {featured && (
+        <section className="hero">
+          <div
+            className={`hero__backdrop ${featured.backdrop ? '' : 'hero__backdrop--from-poster'}`}
+            style={{ backgroundImage: `url(${featured.backdrop ?? featured.logo})` }}
+          />
+          <div className="hero__scrim" />
+          <div className="hero__body">
+            <div className="hero__poster">
+              <Poster src={featured.logo} name={featured.name} />
+            </div>
+            <div className="hero__text">
+              <span className="hero__eyebrow">{featured.kind === 'movie' ? 'Öne çıkan film' : 'Öne çıkan dizi'}</span>
+              <h1>{featured.name}</h1>
+              <div className="hero__meta">
+                {featured.year && <span>{featured.year}</span>}
+                {featured.rating ? (
+                  <span className="chip chip--rating">
+                    <StarIcon size={13} filled /> {featured.rating.toFixed(1)}
+                  </span>
+                ) : null}
+                {featured.genre && <span>{featured.genre}</span>}
+              </div>
+              {featured.plot && <p className="hero__plot">{featured.plot}</p>}
+              <div className="hero__actions">
+                <button
+                  type="button"
+                  className="btn btn--primary btn--large"
+                  onClick={() => {
+                    // Filmi dogrudan baslatiyoruz; dizide once bolum secilmeli.
+                    if (featured.kind === 'movie') {
+                      play({
+                        url: featured.url,
+                        title: featured.name,
+                        subtitle: featured.genre,
+                        live: false,
+                        itemId: featured.id,
+                        kind: 'movie',
+                        poster: featured.logo,
+                      });
+                      return;
+                    }
+                    navigate(`/series/${encodeURIComponent(featured.id)}`);
+                  }}
+                >
+                  <PlayIcon size={18} /> {featured.kind === 'movie' ? 'Oynat' : 'Bolumler'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--large"
+                  onClick={() =>
+                    navigate(
+                      `/${featured.kind === 'movie' ? 'movies' : 'series'}/${encodeURIComponent(featured.id)}`,
+                    )
+                  }
+                >
+                  Detaylar
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {resume.length > 0 && (
         <Rail title="Izlemeye devam et">
           {resume.map((entry) => (

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { colorFromName } from '../lib/format';
+import { PlayIcon } from './icons';
 
 export function Spinner({ label }: { label?: string }) {
   return (
@@ -68,6 +69,10 @@ export function Card({ name, image, meta, badge, progressPercent, wide, onSelect
     >
       <div className="card__art">
         <Poster src={image} name={name} wide={wide} />
+        <span className="card__shine" aria-hidden="true" />
+        <span className="card__play" aria-hidden="true">
+          <PlayIcon size={22} />
+        </span>
         {badge && <span className="card__badge">{badge}</span>}
         {progressPercent !== undefined && progressPercent > 0 && (
           <div className="card__progress">
@@ -80,6 +85,21 @@ export function Card({ name, image, meta, badge, progressPercent, wide, onSelect
         {meta && <span className="card__meta">{meta}</span>}
       </div>
     </button>
+  );
+}
+
+/**
+ * Canli yayindaki programin ne kadarinin gectigini gosteren ince cubuk.
+ * Kanal listelerinde "su an ne var" bilgisini tek bakista okunur kilar.
+ */
+export function LiveProgress({ start, stop }: { start: number; stop: number }) {
+  const total = stop - start;
+  if (total <= 0) return null;
+  const percent = Math.min(100, Math.max(0, ((Date.now() - start) / total) * 100));
+  return (
+    <span className="live-progress" aria-hidden="true">
+      <span className="live-progress__fill" style={{ width: `${percent}%` }} />
+    </span>
   );
 }
 

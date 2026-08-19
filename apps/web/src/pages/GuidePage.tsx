@@ -46,6 +46,13 @@ export function GuidePage() {
     [start],
   );
 
+  /** Su anki zaman gorunen pencerede ise dikey bir cizgi ile isaretlenir. */
+  const nowOffset = useMemo(() => {
+    const now = Date.now();
+    if (now < start || now > end) return undefined;
+    return ((now - start) / HOUR) * PIXELS_PER_HOUR;
+  }, [end, start]);
+
   if (!epg.hasData) {
     return (
       <EmptyState
@@ -73,11 +80,20 @@ export function GuidePage() {
 
       <div className="guide__scroll">
         <div className="guide__grid" style={{ width: PIXELS_PER_HOUR * WINDOW_HOURS + 220 }}>
+          {nowOffset !== undefined && (
+            <div className="guide__now" style={{ left: 220 + nowOffset }} aria-hidden="true">
+              <span className="guide__now-dot" />
+            </div>
+          )}
           <div className="guide__row guide__row--head">
             <div className="guide__channel" />
             <div className="guide__timeline">
-              {hourMarks.map((mark) => (
-                <div key={mark} className="guide__hour" style={{ width: PIXELS_PER_HOUR }}>
+              {hourMarks.map((mark, index) => (
+                <div
+                  key={mark}
+                  className="guide__hour"
+                  style={{ width: PIXELS_PER_HOUR, left: index * PIXELS_PER_HOUR }}
+                >
                   {formatClock(mark)}
                 </div>
               ))}

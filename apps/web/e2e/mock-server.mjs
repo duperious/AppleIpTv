@@ -9,16 +9,22 @@ import { readFileSync } from 'node:fs';
 
 const VIDEO = readFileSync(new URL('./fixtures-video.webm', import.meta.url));
 
+const art = (name, wide) => `http://127.0.0.1:8899/art/${encodeURIComponent(name)}.svg${wide ? '?wide=1' : ''}`;
+
 const M3U = `#EXTM3U url-tvg="http://127.0.0.1:8899/xmltv"
-#EXTINF:-1 tvg-id="trt1.tr" tvg-name="TRT 1" tvg-logo="http://127.0.0.1:8899/logo.png" group-title="Ulusal" tvg-chno="1",TRT 1 HD
+#EXTINF:-1 tvg-id="trt1.tr" tvg-name="TRT 1" tvg-logo="${art('TRT 1', true)}" group-title="Ulusal" tvg-chno="1",TRT 1 HD
 http://127.0.0.1:8899/nocors/live/1.ts
-#EXTINF:-1 tvg-id="beinsports1.tr" group-title="Spor",beIN SPORTS 1 FHD
+#EXTINF:-1 tvg-id="beinsports1.tr" tvg-logo="${art('beIN 1', true)}" group-title="Spor" tvg-chno="53",beIN SPORTS 1 FHD
 http://127.0.0.1:8899/live/2.m3u8
-#EXTINF:7200 group-title="Filmler",Inception (2010)
+#EXTINF:7200 tvg-logo="${art('Inception')}" group-title="Filmler",Inception (2010)
 http://127.0.0.1:8899/movie/10.webm
-#EXTINF:-1 group-title="Diziler",Dark S01 E01 - Sirlar
+#EXTINF:6900 tvg-logo="${art('Interstellar')}" group-title="Filmler",Interstellar (2014)
+http://127.0.0.1:8899/movie/11.webm
+#EXTINF:8100 tvg-logo="${art('Dune')}" group-title="Filmler",Dune (2021)
+http://127.0.0.1:8899/movie/12.webm
+#EXTINF:-1 tvg-logo="${art('Dark')}" group-title="Diziler",Dark S01 E01 - Sirlar
 http://127.0.0.1:8899/series/20.mkv
-#EXTINF:-1 group-title="Diziler",Dark S01 E02 - Yalanlar
+#EXTINF:-1 tvg-logo="${art('Dark')}" group-title="Diziler",Dark S01 E02 - Yalanlar
 http://127.0.0.1:8899/series/21.mkv
 `;
 
@@ -41,6 +47,23 @@ const XMLTV = `<?xml version="1.0" encoding="UTF-8"?>
 /** Gelen istekleri testlerin inceleyebilmesi icin kaydeder. */
 const requestLog = [];
 
+/** Basit, deterministik SVG afis/logo uretir (disaridan gorsel indirmeden). */
+function artwork(title, wide) {
+  let hash = 0;
+  for (const char of title) hash = (hash * 31 + char.charCodeAt(0)) & 0xffffff;
+  const hue = Math.abs(hash) % 360;
+  const [w, h] = wide ? [320, 180] : [400, 600];
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="hsl(${hue} 62% 32%)"/>
+    <stop offset="100%" stop-color="hsl(${(hue + 48) % 360} 58% 14%)"/>
+  </linearGradient></defs>
+  <rect width="${w}" height="${h}" fill="url(#g)"/>
+  <text x="50%" y="50%" fill="rgba(255,255,255,.92)" font-family="sans-serif" font-size="${wide ? 22 : 34}"
+        font-weight="600" text-anchor="middle" dominant-baseline="middle">${title.replace(/[<&]/g, '')}</text>
+</svg>`;
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1:8899');
   requestLog.push(url.pathname);
@@ -51,6 +74,12 @@ const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
 
+  if (url.pathname.startsWith('/art/')) {
+    const title = decodeURIComponent(url.pathname.slice(5).replace(/\.svg$/, ''));
+    res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Access-Control-Allow-Origin': '*' });
+    res.end(artwork(title, url.searchParams.has('wide')));
+    return;
+  }
   if (url.pathname === '/__requests') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify(requestLog));

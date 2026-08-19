@@ -2,6 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { attachEngine, playbackCandidates } from './engine';
 import type { EngineHandle } from './engine';
 import { formatPosition } from '../lib/format';
+import {
+  BackIcon,
+  FullscreenIcon,
+  LiveIcon,
+  PauseIcon,
+  PipIcon,
+  PlayIcon,
+  SettingsIcon,
+  SkipBackIcon,
+  SkipForwardIcon,
+  VolumeIcon,
+} from '../components/icons';
 
 export interface MediaPlayerProps {
   url: string;
@@ -393,14 +405,18 @@ export function MediaPlayer(props: MediaPlayerProps) {
 
       <div className="player__controls">
         <div className="player__top">
-          <button type="button" className="btn btn--ghost" onClick={onClose} aria-label="Geri">
-            ← Geri
+          <button type="button" className="btn btn--icon btn--glass" onClick={onClose} aria-label="Geri">
+            <BackIcon size={22} />
           </button>
           <div className="player__titles">
             <h2>{title}</h2>
             {subtitle && <p>{subtitle}</p>}
           </div>
-          {live && <span className="badge badge--live">CANLI</span>}
+          {live && (
+            <span className="badge badge--live">
+              <LiveIcon size={9} /> CANLI
+            </span>
+          )}
         </div>
 
         <div className="player__bottom">
@@ -425,32 +441,37 @@ export function MediaPlayer(props: MediaPlayerProps) {
           )}
 
           <div className="player__buttons">
-            <button type="button" className="btn btn--icon" onClick={togglePlay}>
-              {playing ? '❚❚' : '▶'}
+            <button type="button" className="btn btn--icon btn--glass btn--play" onClick={togglePlay} aria-label={playing ? 'Duraklat' : 'Oynat'}>
+              {playing ? <PauseIcon size={22} /> : <PlayIcon size={22} />}
             </button>
             {!live && (
               <>
-                <button type="button" className="btn btn--icon" onClick={() => seekBy(-SEEK_STEP)}>⏪</button>
-                <button type="button" className="btn btn--icon" onClick={() => seekBy(SEEK_STEP)}>⏩</button>
+                <button type="button" className="btn btn--icon btn--glass" onClick={() => seekBy(-SEEK_STEP)} aria-label="10 saniye geri">
+                  <SkipBackIcon size={20} />
+                </button>
+                <button type="button" className="btn btn--icon btn--glass" onClick={() => seekBy(SEEK_STEP)} aria-label="10 saniye ileri">
+                  <SkipForwardIcon size={20} />
+                </button>
                 <span className="player__time">
                   {formatPosition(position)} / {duration > 0 ? formatPosition(duration) : '--:--'}
                 </span>
               </>
             )}
             {live && engineRef.current?.seekToLive && (
-              <button type="button" className="btn btn--ghost" onClick={() => engineRef.current?.seekToLive?.()}>
-                Cana don
+              <button type="button" className="btn btn--glass" onClick={() => engineRef.current?.seekToLive?.()}>
+                <LiveIcon size={9} /> Cana don
               </button>
             )}
             {autoMuted && (
               <button type="button" className="btn btn--primary player__unmute" onClick={unmute}>
-                🔊 Sesi ac
+                <VolumeIcon size={17} /> Sesi ac
               </button>
             )}
             <span className="player__spacer" />
             <button
               type="button"
-              className="btn btn--icon"
+              className="btn btn--icon btn--glass"
+              aria-label={muted ? 'Sesi ac' : 'Sesi kapat'}
               onClick={() => {
                 const video = videoRef.current;
                 if (!video) return;
@@ -458,7 +479,7 @@ export function MediaPlayer(props: MediaPlayerProps) {
                 setMuted(video.muted);
               }}
             >
-              {muted || volume === 0 ? '🔇' : '🔊'}
+              <VolumeIcon size={20} muted={muted || volume === 0} />
             </button>
             <input
               className="player__volume"
@@ -480,13 +501,20 @@ export function MediaPlayer(props: MediaPlayerProps) {
               aria-label="Ses"
             />
             {onNext && (
-              <button type="button" className="btn btn--ghost" onClick={onNext}>
-                Sonraki bolum
+              <button type="button" className="btn btn--glass" onClick={onNext}>
+                <SkipForwardIcon size={17} /> Sonraki bolum
               </button>
             )}
             {levels.length > 1 && (
               <div className="player__menu">
-                <button type="button" className="btn btn--icon" onClick={() => setShowSettings((v) => !v)}>⚙</button>
+                <button
+                  type="button"
+                  className="btn btn--icon btn--glass"
+                  aria-label="Kalite"
+                  onClick={() => setShowSettings((v) => !v)}
+                >
+                  <SettingsIcon size={19} />
+                </button>
                 {showSettings && (
                   <ul className="player__menu-list">
                     <li>
@@ -521,8 +549,12 @@ export function MediaPlayer(props: MediaPlayerProps) {
                 )}
               </div>
             )}
-            <button type="button" className="btn btn--icon" onClick={() => void togglePip()}>⧉</button>
-            <button type="button" className="btn btn--icon" onClick={toggleFullscreen}>⛶</button>
+            <button type="button" className="btn btn--icon btn--glass" onClick={() => void togglePip()} aria-label="Kucuk pencere">
+              <PipIcon size={19} />
+            </button>
+            <button type="button" className="btn btn--icon btn--glass" onClick={toggleFullscreen} aria-label="Tam ekran">
+              <FullscreenIcon size={19} />
+            </button>
           </div>
         </div>
       </div>

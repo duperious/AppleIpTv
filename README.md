@@ -80,6 +80,8 @@ Xtream bilgilerinizi veya M3U adresinizi girin.
 
 Tarayicilar, IPTV sunucularina dogrudan yapilan isteklerde cogu zaman CORS
 engeline takilir (sunucular `Access-Control-Allow-Origin` basligi gondermez).
+Film ve diziler bundan etkilenmez (dogrudan `<video>` ile oynatilirlar) ama
+**canli yayinlar JavaScript ile indirildigi icin proxy olmadan acilmaz.**
 Bunun icin depoda kucuk bir proxy var:
 
 ```bash
