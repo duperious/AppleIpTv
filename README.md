@@ -106,6 +106,12 @@ Uygulama bir PWA'dir; Safari/Chrome'da "Ana ekrana ekle" ile tam ekran
 calisir. Tum veriler tarayicinin IndexedDB'sinde tutulur, sunucuya hicbir
 sey gonderilmez.
 
+### macOS kullaniyorsaniz
+
+`./scripts/macos/baslat.sh` her seyi (proxy dahil) tek komutla baslatir.
+Ayrintilar, terminalden yayin tanilama ve Apple TV'ye kurulum icin:
+[`docs/MACOS.md`](docs/MACOS.md).
+
 ### Windows kullaniyorsaniz
 
 Adim adim kurulum, tek tikla baslatma dosyasi ve Windows'a ozel sorun
@@ -157,6 +163,20 @@ Veri akisi her iki platformda da ayni: **kaynak -> katalog -> dizin ->
 gorunum**. Katalog ve EPG yerel olarak saklanir (web'de IndexedDB, tvOS'ta
 Application Support altinda JSON), boylece uygulama acilista aninda dolu gelir
 ve arka planda tazelenir.
+
+## Yayin tanilama (terminal)
+
+Canli yayin acilmiyorsa, tarayiciyi denklemden cikarip saglayiciyi
+dogrudan test edin:
+
+```bash
+npm run tani -- --xtream http://sunucu.com:8080 kullanici sifre
+npm run tani -- "http://sunucu.com:8080/live/kullanici/sifre/123.m3u8"
+```
+
+Hesabi dogrular, tarayici ve oynatici User-Agent'larini karsilastirir,
+`.m3u8`/`.ts` bicimlerini dener, yonlendirmeleri takip eder ve gercek
+yayin parcasina kadar iner. Cikti kopyalanabilir; sifre maskelenir.
 
 ## Gelistirme
 

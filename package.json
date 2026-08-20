@@ -13,7 +13,10 @@
     "dev": "npm run dev -w @appleiptv/web",
     "proxy": "npm run start -w @appleiptv/proxy",
     "test": "npm run test -w @appleiptv/core",
-    "typecheck": "npm run typecheck -w @appleiptv/core && npm run typecheck -w @appleiptv/web"
+    "typecheck": "npm run typecheck -w @appleiptv/core && npm run typecheck -w @appleiptv/web",
+    "tani": "node scripts/tani.mjs"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }
