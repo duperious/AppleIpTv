@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { categoriesOfKind, itemsInCategory } from '@appleiptv/core';
 import type { LiveChannel } from '@appleiptv/core';
 import { useCatalog, useHiddenCategoryIds, useCatalogIndex } from '../store/useApp';
-import { EmptyState } from '../components/ui';
+import { EmptyState, Poster } from '../components/ui';
+import { scopeToPlaylist, usePlaylistScope } from '../hooks/usePlaylistScope';
 import { useEpg } from '../hooks/useEpg';
 import { formatClock } from '../lib/format';
 import { usePlayback } from '../playback/PlaybackProvider';
@@ -24,6 +25,7 @@ export function GuidePage() {
     () => categoriesOfKind(catalog, 'live', { hiddenCategoryIds: hidden }),
     [catalog, hidden],
   );
+  const { playlistId, playlistName } = usePlaylistScope();
   const [categoryId, setCategoryId] = useState<string>('');
   const [offsetHours, setOffsetHours] = useState(0);
 
@@ -38,8 +40,8 @@ export function GuidePage() {
     const list = categoryId
       ? itemsInCategory(catalog, index, categoryId).filter((item): item is LiveChannel => item.kind === 'live')
       : catalog.live.filter((channel) => !channel.categoryIds.some((id) => hidden.has(id)));
-    return list.slice(0, MAX_ROWS);
-  }, [catalog, categoryId, hidden, index]);
+    return scopeToPlaylist(list, playlistId).slice(0, MAX_ROWS);
+  }, [catalog, categoryId, hidden, index, playlistId]);
 
   const hourMarks = useMemo(
     () => Array.from({ length: WINDOW_HOURS }, (_unused, i) => start + i * HOUR),
@@ -86,7 +88,7 @@ export function GuidePage() {
             </div>
           )}
           <div className="guide__row guide__row--head">
-            <div className="guide__channel" />
+            <div className="guide__channel guide__channel--head">{playlistName ?? 'Kanal'}</div>
             <div className="guide__timeline">
               {hourMarks.map((mark, index) => (
                 <div
@@ -104,7 +106,12 @@ export function GuidePage() {
             const programs = epg.range(channel, start, end);
             return (
               <div key={channel.id} className="guide__row">
-                <div className="guide__channel">{channel.name}</div>
+                <div className="guide__channel">
+                  <span className="guide__channel-logo">
+                    <Poster src={channel.logo} name={channel.name} wide />
+                  </span>
+                  <span className="guide__channel-name">{channel.name}</span>
+                </div>
                 <div className="guide__timeline">
                   {programs.length === 0 && <div className="guide__empty">Bilgi yok</div>}
                   {programs.map((program) => {

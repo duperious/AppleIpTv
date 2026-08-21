@@ -4,6 +4,7 @@ import { categoriesOfKind, itemsInCategory, normalizeText } from '@appleiptv/cor
 import type { MediaKind, MovieItem, SeriesItem } from '@appleiptv/core';
 import { useCatalog, useHiddenCategoryIds, useCatalogIndex } from '../store/useApp';
 import { Card, EmptyState, LazyGrid } from '../components/ui';
+import { scopeToPlaylist, usePlaylistScope } from '../hooks/usePlaylistScope';
 
 type Sortable = MovieItem | SeriesItem;
 type SortMode = 'default' | 'name' | 'year' | 'rating';
@@ -14,6 +15,7 @@ export function BrowsePage({ kind }: { kind: Exclude<MediaKind, 'live'> }) {
   const catalog = useCatalog();
   const hidden = useHiddenCategoryIds(catalog);
   const index = useCatalogIndex(catalog);
+  const { playlistId, playlistName } = usePlaylistScope();
 
   const [categoryId, setCategoryId] = useState('');
   const [filter, setFilter] = useState('');
@@ -29,7 +31,9 @@ export function BrowsePage({ kind }: { kind: Exclude<MediaKind, 'live'> }) {
       ? (itemsInCategory(catalog, index, categoryId) as Sortable[])
       : ((kind === 'movie' ? catalog.movies : catalog.series) as Sortable[]);
 
-    let list = pool.filter((item) => !item.categoryIds.some((id) => hidden.has(id)));
+    let list = scopeToPlaylist(pool, playlistId).filter(
+      (item) => !item.categoryIds.some((id) => hidden.has(id)),
+    );
     const needle = normalizeText(filter);
     if (needle) list = list.filter((item) => item.searchKey.includes(needle));
 
@@ -48,7 +52,7 @@ export function BrowsePage({ kind }: { kind: Exclude<MediaKind, 'live'> }) {
         sorted.sort((a, b) => a.order - b.order);
     }
     return sorted;
-  }, [catalog, categoryId, filter, hidden, index, kind, sort]);
+  }, [catalog, categoryId, filter, hidden, index, kind, playlistId, sort]);
 
   const title = kind === 'movie' ? 'Filmler' : 'Diziler';
 
@@ -60,6 +64,7 @@ export function BrowsePage({ kind }: { kind: Exclude<MediaKind, 'live'> }) {
     <div className="page">
       <header className="browse__toolbar">
         <h1>{title}</h1>
+        {playlistName && <span className="scope-badge">{playlistName}</span>}
         <select className="input" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
           <option value="">Tum kategoriler</option>
           {categories.map((category) => (

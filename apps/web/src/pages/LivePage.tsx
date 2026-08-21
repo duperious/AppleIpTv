@@ -4,6 +4,7 @@ import type { LiveChannel } from '@appleiptv/core';
 import { useActiveProfile, useApp, useCatalog, useHiddenCategoryIds, useCatalogIndex } from '../store/useApp';
 import { EmptyState, LiveProgress, PinDialog, Poster } from '../components/ui';
 import { LockIcon, PlayIcon, SearchIcon, StarIcon } from '../components/icons';
+import { scopeToPlaylist, usePlaylistScope } from '../hooks/usePlaylistScope';
 import { usePlayback } from '../playback/PlaybackProvider';
 import { useEpg } from '../hooks/useEpg';
 import { formatClock } from '../lib/format';
@@ -23,6 +24,7 @@ export function LivePage() {
   const { play } = usePlayback();
   const epg = useEpg();
 
+  const { playlistId, playlistName } = usePlaylistScope();
   const [categoryId, setCategoryId] = useState<string>(ALL);
   const [filter, setFilter] = useState('');
   const [selectedId, setSelectedId] = useState<string | undefined>();
@@ -50,10 +52,11 @@ export function LivePage() {
         (item): item is LiveChannel => item.kind === 'live',
       );
     }
+    list = scopeToPlaylist(list, playlistId);
     const needle = normalizeText(filter);
     if (needle) list = list.filter((channel) => channel.searchKey.includes(needle));
     return list;
-  }, [catalog, categoryId, favorites, filter, hidden, index, lockedIds]);
+  }, [catalog, categoryId, favorites, filter, hidden, index, lockedIds, playlistId]);
 
   const selected = useMemo(
     () => channels.find((channel) => channel.id === selectedId) ?? channels[0],
@@ -78,7 +81,7 @@ export function LivePage() {
   return (
     <div className="live">
       <aside className="live__categories">
-        <span className="live__categories-title">Kategoriler</span>
+        <span className="live__categories-title">{playlistName ?? 'Kategoriler'}</span>
         <button type="button" className={categoryId === ALL ? 'is-active' : ''} onClick={() => openCategory(ALL)}>
           <span className="live__category-name">Tum kanallar</span>
           <span className="live__category-count">{catalog.live.length}</span>
