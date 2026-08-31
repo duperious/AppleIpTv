@@ -55,6 +55,58 @@ function shortError(error: unknown): string {
  * Amac, "acilmiyor" durumunu tek bir ekranda somut bir nedene indirgemek:
  * karisik icerik, CORS, proxy erisimi, saglayicinin reddi veya yanlis bicim.
  */
+
+/**
+ * Tarayicinin canli yayinlarda kullanilan codec'leri cozup cozemedigini
+ * olcer.
+ *
+ * Linux dagitimlarinda (Arch/CachyOS dahil) tarayicilar H.264/AAC
+ * cozumunu sistemdeki ffmpeg kitapliklarina birakir; eksikse yayin
+ * "aciliyor ama goruntu yok" seklinde sessizce basarisiz olur. Bu adim
+ * o durumu goruntu beklemeden ortaya cikarir.
+ */
+function checkCodecs(): DiagnosticStep {
+  const mediaSource = typeof MediaSource !== 'undefined' ? MediaSource : undefined;
+  if (!mediaSource?.isTypeSupported) {
+    return {
+      id: 'codecs',
+      title: 'Codec destegi',
+      status: 'fail',
+      detail: 'Tarayici Media Source Extensions desteklemiyor; canli yayin oynatilamaz.',
+      hint: 'Guncel bir Chrome, Edge, Firefox veya Safari surumu kullanin.',
+    };
+  }
+
+  const probes: { label: string; type: string; required: boolean }[] = [
+    { label: 'H.264', type: 'video/mp4; codecs="avc1.42E01E"', required: true },
+    { label: 'H.264 High', type: 'video/mp4; codecs="avc1.640028"', required: true },
+    { label: 'AAC', type: 'video/mp4; codecs="mp4a.40.2"', required: true },
+    { label: 'HEVC', type: 'video/mp4; codecs="hvc1.1.6.L93.B0"', required: false },
+  ];
+
+  const supported = probes.filter((probe) => mediaSource.isTypeSupported(probe.type));
+  const missingRequired = probes.filter((probe) => probe.required && !supported.includes(probe));
+  const names = (list: typeof probes) => list.map((probe) => probe.label).join(', ');
+
+  if (missingRequired.length > 0) {
+    return {
+      id: 'codecs',
+      title: 'Codec destegi',
+      status: 'fail',
+      detail: `Eksik: ${names(missingRequired)}. Desteklenen: ${names(supported) || 'yok'}.`,
+      hint: 'Linux kullaniyorsaniz sistemde ffmpeg kurulu olmali (Arch/CachyOS: sudo pacman -S ffmpeg). Firefox sistem ffmpeg\'ini kullanir; Chromium surumunuz tescilli codec\'ler olmadan derlenmis olabilir.',
+    };
+  }
+
+  const hevc = probes.find((probe) => probe.label === 'HEVC');
+  return {
+    id: 'codecs',
+    title: 'Codec destegi',
+    status: 'ok',
+    detail: `H.264 ve AAC destekleniyor${hevc && supported.includes(hevc) ? ', HEVC de destekleniyor' : ' (HEVC yok - 4K/HEVC kanallar acilmayabilir)'}.`,
+  };
+}
+
 export async function runStreamDiagnostics(input: DiagnosticsInput): Promise<DiagnosticStep[]> {
   const steps: DiagnosticStep[] = [];
   const { url, proxyUrl, userAgent } = input;
@@ -97,7 +149,10 @@ export async function runStreamDiagnostics(input: DiagnosticsInput): Promise<Dia
         : undefined,
   });
 
-  // 3) Proxy tanimli mi ve ayakta mi?
+  // 3) Tarayici gereken codec'leri cozebiliyor mu?
+  steps.push(checkCodecs());
+
+  // 4) Proxy tanimli mi ve ayakta mi?
   if (!proxyUrl) {
     steps.push({
       id: 'proxy-configured',

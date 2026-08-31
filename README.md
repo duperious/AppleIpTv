@@ -106,11 +106,14 @@ Uygulama bir PWA'dir; Safari/Chrome'da "Ana ekrana ekle" ile tam ekran
 calisir. Tum veriler tarayicinin IndexedDB'sinde tutulur, sunucuya hicbir
 sey gonderilmez.
 
-### macOS kullaniyorsaniz
+### macOS veya Linux kullaniyorsaniz
 
-`./scripts/macos/baslat.sh` her seyi (proxy dahil) tek komutla baslatir.
-Ayrintilar, terminalden yayin tanilama ve Apple TV'ye kurulum icin:
-[`docs/MACOS.md`](docs/MACOS.md).
+`./scripts/unix/baslat.sh` her seyi (proxy dahil) tek komutla baslatir.
+
+- macOS: kurulum, terminalden tanilama ve Apple TV'ye kurulum ->
+  [`docs/MACOS.md`](docs/MACOS.md)
+- Linux (CachyOS / Arch): paketler, codec kontrolu ve systemd ile
+  otomatik proxy -> [`docs/LINUX.md`](docs/LINUX.md)
 
 ### Windows kullaniyorsaniz
 

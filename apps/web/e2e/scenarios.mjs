@@ -236,9 +236,21 @@ export async function hostileProviderFlow(page, baseURL) {
     () => document.querySelectorAll('.diagnostics__step').length >= 5,
     { timeout: 40_000 },
   );
-  const failed = await page.locator('.diagnostics__step.is-fail').allTextContents();
   const results = await page.locator('.diagnostics__step strong').allTextContents();
   log('tanilama adimlari:', results.join(', '));
+
+  // Codec adimi tarayici derlemesine baglidir: gomulu/headless Chromium
+  // surumleri genellikle tescilli codec'ler (H.264/AAC) olmadan gelir.
+  // Bu senaryo saglayici ve proxy zincirini dogruluyor, tarayici
+  // derlemesini degil; o adim ayrica raporlanip disarida birakiliyor.
+  const codecStatus = await page
+    .locator('.diagnostics__step:has-text("Codec destegi")')
+    .getAttribute('class');
+  log('codec adimi:', codecStatus?.includes('is-fail') ? 'bu tarayicida H.264/AAC yok' : 'destekleniyor');
+
+  const failed = await page
+    .locator('.diagnostics__step.is-fail:not(:has-text("Codec destegi"))')
+    .allTextContents();
   if (failed.length > 0) throw new Error(`Tanilama basarisiz adim(lar): ${failed.join(' | ')}`);
 
   // Oynatma: yonlendirme + goreli adresler cozulup parcalar inmeli.

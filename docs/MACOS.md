@@ -30,7 +30,7 @@ cd AppleIpTv
 Tek komut:
 
 ```bash
-./scripts/macos/baslat.sh
+./scripts/unix/baslat.sh
 ```
 
 Bu betik bagimliliklari kurar, cekirdegi derler, **CORS proxy'sini** ve web
@@ -150,8 +150,8 @@ bir yola yonlendiren ve goreli adresli oynatma listeleri veren sunucular.
 
 ## Sik sorunlar
 
-**`./scripts/macos/baslat.sh: Permission denied`**
-`chmod +x scripts/macos/baslat.sh` calistirin.
+**`./scripts/unix/baslat.sh: Permission denied`**
+`chmod +x scripts/unix/baslat.sh` calistirin.
 
 **"Port 5173 kullanimda"**
 `npm run dev -w @appleiptv/web -- --port 5200`

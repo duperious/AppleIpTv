@@ -1,0 +1,33 @@
+# CORS proxy'sini oturum acildiginda otomatik baslatan systemd birimi.
+#
+# Kurulum (kullanici servisi olarak, sudo gerekmez):
+#   mkdir -p ~/.config/systemd/user
+#   sed "s|/PROJE/YOLU|$PWD|" scripts/linux/appleiptv-proxy.service \
+#     > ~/.config/systemd/user/appleiptv-proxy.service
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now appleiptv-proxy
+#
+# Durum ve gunluk:
+#   systemctl --user status appleiptv-proxy
+#   journalctl --user -u appleiptv-proxy -f
+
+[Unit]
+Description=AppleIpTv CORS proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/PROJE/YOLU
+ExecStart=/usr/bin/env node apps/proxy/src/server.js
+Restart=on-failure
+RestartSec=3
+# Yalnizca kendi makinenizi dinler. Ev aginizdaki diger cihazlardan
+# erisecekseniz HOST=0.0.0.0 yapin.
+Environment=HOST=127.0.0.1
+Environment=PORT=8787
+# Saglayiciniz belirli bir oynatici kimligi bekliyorsa:
+# Environment=UPSTREAM_USER_AGENT=Kodi/20.2
+
+[Install]
+WantedBy=default.target
